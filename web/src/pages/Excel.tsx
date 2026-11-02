@@ -5,6 +5,7 @@ import { supabase, must } from '../lib/supabase'
 import { cap, dm, dmy, kg, money, parseMoney, today, addDays } from '../lib/format'
 import { parseSheets, suspiciousPrices, type ImportResult } from '../lib/excel'
 import type { CashEntry, Purchase, Sale, StockAdj } from '../lib/types'
+import { MoneyInput } from '../components/ui'
 
 const CHUNK = 500
 
@@ -94,7 +95,7 @@ export default function Excel() {
                   <div key={key} className="row-actions">
                     <span style={{ flex: 1, minWidth: 180 }}>{kind} {dm(r.date)}: {cap(r.product)} {kg(r.qty)}kg × {money(r.unit_price)}
                       {'total_price' in r && r.total_price ? <span className="sub"> · cột thành tiền ÷ kg ra {money(r.total_price)}/kg, có thể sai giá hoặc sai số kg</span> : null}</span>
-                    <input aria-label="Giá đúng" inputMode="numeric" placeholder="giá đúng" style={{ width: 120 }} value={fix[key] || ''} onChange={e => setFix({ ...fix, [key]: e.target.value })} />
+                    <MoneyInput aria-label="Giá đúng" placeholder="giá đúng" style={{ width: 120 }} value={fix[key] || ''} onChange={e => setFix({ ...fix, [key]: e.target.value })} />
                   </div>))}
               </div>)}
             <div className="row-actions"><button type="button" className="btn" disabled={busy || !(res.sales.length + res.purchases.length)} onClick={() => void doImport()}>{busy ? 'Đang nhập…' : 'Nhập vào sổ'}</button>

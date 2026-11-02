@@ -3,7 +3,7 @@ import { useApp } from '../lib/app'
 import { supabase, must } from '../lib/supabase'
 import { cap, dm, kg, money, parseMoney, parseNum, short, toThousand } from '../lib/format'
 import { purchaseAmount, type PayMethod, type Purchase } from '../lib/types'
-import { ConfirmButton, Empty, PayPill, Seg, Tile, useLive } from '../components/ui'
+import { ConfirmButton, Empty, PayPill, Seg, Tile, useLive, MoneyInput } from '../components/ui'
 
 type Pay = PayMethod | 'debt'
 const blank = { product: '', supplier: '', size: '', qty: '', price: '', freight: '', note: '', pay: 'cash' as Pay }
@@ -109,9 +109,9 @@ export default function Purchases() {
             <input id="b_src" list="dl-suppliers" value={f.supplier} placeholder="vũ ghẹ" onChange={set('supplier')} /></div>
           <div className="f c2"><label htmlFor="b_size">Size</label><input id="b_size" value={f.size} placeholder="3-4 con" onChange={set('size')} /></div>
           <div className="f c2"><label htmlFor="b_qty">Số kg</label><input id="b_qty" inputMode="decimal" value={f.qty} onChange={set('qty')} /></div>
-          <div className="f c2"><label htmlFor="b_price">Giá nhập / kg</label><input id="b_price" inputMode="numeric" value={f.price} placeholder="400" onChange={set('price')} />
+          <div className="f c2"><label htmlFor="b_price">Giá nhập / kg</label><MoneyInput id="b_price" value={f.price} placeholder="400" onChange={set('price')} />
             <span className="hint">{price > 0 ? `= ${money(price)}/kg` : 'gõ 400 = 400.000đ'}</span></div>
-          <div className="f c2"><label htmlFor="b_fr">Cước xe + bãi</label><input id="b_fr" inputMode="numeric" value={f.freight} placeholder="0" onChange={set('freight')} />
+          <div className="f c2"><label htmlFor="b_fr">Cước xe + bãi</label><MoneyInput id="b_fr" value={f.freight} placeholder="0" onChange={set('freight')} />
             <span className="hint">gõ 60 = 60.000đ</span></div>
           <div className="f c2"><label>Thành tiền</label><div className="big">{money(amount)}</div></div>
           <div className="f c2"><label>Giá vốn / kg (gồm cước)</label><div className="big" style={{ fontSize: 16 }}>{qty > 0 && price > 0 ? money((amount + freight) / qty) : '–'}</div></div>

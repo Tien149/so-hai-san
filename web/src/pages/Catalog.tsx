@@ -3,7 +3,7 @@ import { useApp } from '../lib/app'
 import { supabase, must } from '../lib/supabase'
 import { cap, parseMoney, toThousand, money } from '../lib/format'
 import type { PartnerKind } from '../lib/types'
-import { Empty } from '../components/ui'
+import { Empty, MoneyInput } from '../components/ui'
 
 export default function Catalog() {
   const app = useApp()
@@ -31,7 +31,7 @@ export default function Catalog() {
             <tbody>{products.map(p => (
               <tr key={p.id}>
                 <td><input aria-label="Tên món" defaultValue={p.name} disabled={!isManager} onBlur={e => { const v = e.target.value.trim().toLowerCase(); if (v && v !== p.name) void save('products', p.id, { name: v }) }} /></td>
-                <td><input aria-label="Giá bán mặc định" inputMode="numeric" defaultValue={toThousand(p.default_sell_price)} disabled={!isManager} placeholder="—"
+                <td><MoneyInput aria-label="Giá bán mặc định" defaultValue={toThousand(p.default_sell_price)} disabled={!isManager} placeholder="—"
                   onBlur={e => { const v = e.target.value.trim() ? parseMoney(e.target.value) : null; if (v !== p.default_sell_price && (v == null || v > 0)) void save('products', p.id, { default_sell_price: v }) }} />
                   {p.default_sell_price ? <span className="hint">{money(p.default_sell_price)}</span> : null}</td>
                 <td><input type="checkbox" aria-label="Đang bán" checked={p.active} disabled={!isManager} onChange={e => void save('products', p.id, { active: e.target.checked })} style={{ width: 22, height: 22 }} /></td>

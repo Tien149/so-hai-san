@@ -3,7 +3,7 @@ import { useApp } from '../lib/app'
 import { supabase, must } from '../lib/supabase'
 import { addDays, cap, dm, kg, money, parseMoney, parseNum, short, toThousand } from '../lib/format'
 import { saleAmount, saleTotal, type PayMethod, type Sale } from '../lib/types'
-import { ConfirmButton, Empty, PayPill, Seg, Tile, useLive } from '../components/ui'
+import { ConfirmButton, Empty, PayPill, Seg, Tile, useLive, MoneyInput } from '../components/ui'
 
 type Pay = PayMethod | 'debt'
 const blank = { product: '', customer: '', qty: '', price: '', cb: '', ship: '', size: '', note: '', pay: 'cash' as Pay }
@@ -174,13 +174,13 @@ export default function Sales() {
           <div className="f c2"><label htmlFor="s_qty">Số kg</label>
             <input id="s_qty" ref={qtyRef} inputMode="decimal" value={f.qty} placeholder="1,5" onChange={set('qty')} /></div>
           <div className="f c2"><label htmlFor="s_price">Giá / kg</label>
-            <input id="s_price" inputMode="numeric" value={f.price} placeholder="270" onChange={set('price')} />
+            <MoneyInput id="s_price" value={f.price} placeholder="270" onChange={set('price')} />
             <span className="hint">{price > 0 ? `= ${money(price)}/kg` : 'gõ 270 = 270.000đ'}</span></div>
           <div className="f c2"><label>Thành tiền</label><div className="big">{money(total)}</div></div>
           <div className="f c2"><label htmlFor="s_cb">Chế biến</label>
-            <input id="s_cb" inputMode="numeric" value={f.cb} placeholder="0" onChange={set('cb')} /></div>
+            <MoneyInput id="s_cb" value={f.cb} placeholder="0" onChange={set('cb')} /></div>
           <div className="f c2"><label htmlFor="s_ship">Ship</label>
-            <input id="s_ship" inputMode="numeric" value={f.ship} placeholder="0" onChange={set('ship')} /></div>
+            <MoneyInput id="s_ship" value={f.ship} placeholder="0" onChange={set('ship')} /></div>
           <div className="f c2"><label htmlFor="s_size">Size / ghi chú</label>
             <input id="s_size" value={f.size} placeholder="70-80 con" onChange={set('size')} /></div>
           <div className="f c6"><label>Thanh toán</label>

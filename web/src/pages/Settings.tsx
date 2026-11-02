@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { useApp } from '../lib/app'
 import { supabase, must } from '../lib/supabase'
 import { money, parseMoney, plain } from '../lib/format'
+import { MoneyInput } from '../components/ui'
 
 export default function Settings() {
   const app = useApp()
@@ -28,7 +29,7 @@ export default function Settings() {
           <div className="f c6"><label htmlFor="st_name">Tên quán</label><input id="st_name" required value={name} disabled={!owner} onChange={e => setName(e.target.value)} /></div>
           <div className="f c3"><label htmlFor="st_phone">Số điện thoại (in trên hóa đơn)</label><input id="st_phone" inputMode="tel" value={phone} disabled={!owner} onChange={e => setPhone(e.target.value)} /></div>
           <div className="f c3"><label htmlFor="st_addr">Địa chỉ</label><input id="st_addr" value={address} disabled={!owner} onChange={e => setAddress(e.target.value)} /></div>
-          <div className="f c6"><label htmlFor="st_cash">Tiền mặt ban đầu trong két</label><input id="st_cash" inputMode="numeric" value={cash} disabled={!owner} placeholder="20.000.000" onChange={e => setCash(e.target.value)} />
+          <div className="f c6"><label htmlFor="st_cash">Tiền mặt ban đầu trong két</label><MoneyInput id="st_cash" value={cash} disabled={!owner} placeholder="20.000.000" onChange={e => setCash(e.target.value)} />
             <span className="hint">Số tiền mặt có trước ngày ghi sổ đầu tiên, để tính đúng tiền mặt còn lại. {parseMoney(cash) > 0 && '= ' + money(parseMoney(cash))}</span></div>
           {owner ? <div className="c6"><button className="btn" type="submit">Lưu</button></div> : <p className="note c6">Chỉ chủ quán được sửa.</p>}
         </form>

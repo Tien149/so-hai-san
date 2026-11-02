@@ -37,8 +37,14 @@ export function parseMoney(input: unknown): number {
   return n > 0 && n < 1000 ? Math.round(n * 1000) : Math.round(n)
 }
 
-/** Hiển thị tiền ở ô nhập theo đơn vị nghìn */
-export const toThousand = (n: number | null | undefined) => (n ? String(Math.round(n / 1000)) : '')
+/** Hiển thị tiền ở ô nhập, có chấm hàng nghìn: 270000 → "270.000" */
+export const toThousand = (n: number | null | undefined) => (n ? groupDigits(String(Math.round(n))) : '')
+
+/** Giữ lại chữ số và chấm phân cách hàng nghìn: "270000" → "270.000" */
+export function groupDigits(input: string): string {
+  const d = String(input).replace(/\D/g, '').replace(/^0+(?=\d)/, '')
+  return d.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+}
 
 export const normName = (s: unknown) => String(s ?? '').trim().toLowerCase().replace(/\s+/g, ' ')
 export const cap = (s: unknown) => String(s ?? '').replace(/(^|\s)(\p{L})/gu, (_m, a: string, b: string) => a + b.toUpperCase())

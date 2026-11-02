@@ -1,4 +1,5 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState, type InputHTMLAttributes, type ReactNode } from 'react'
+import { groupDigits } from '../lib/format'
 import { supabase } from '../lib/supabase'
 import type { PayMethod } from '../lib/types'
 
@@ -57,4 +58,23 @@ export function useLive(shopId: string | undefined, tables: string[], onChange: 
     document.addEventListener('visibilitychange', onFocus)
     return () => { window.clearTimeout(t); document.removeEventListener('visibilitychange', onFocus); void supabase.removeChannel(ch) }
   }, [shopId, key, onChange])
+}
+
+/** Ô nhập tiền: tự chấm phân cách hàng nghìn khi gõ (270000 → 270.000), giữ vị trí con trỏ */
+export function MoneyInput({ onChange, ...rest }: InputHTMLAttributes<HTMLInputElement>) {
+  return (
+    <input inputMode="numeric" autoComplete="off" {...rest}
+      onChange={e => {
+        const el = e.target
+        const before = el.value.slice(0, el.selectionStart ?? el.value.length).replace(/\D/g, '').length
+        const v = groupDigits(el.value)
+        if (v !== el.value) {
+          el.value = v
+          let pos = 0, d = 0
+          while (pos < v.length && d < before) { if (v[pos] >= '0' && v[pos] <= '9') d++; pos++ }
+          try { el.setSelectionRange(pos, pos) } catch { /* bỏ qua */ }
+        }
+        onChange?.(e)
+      }} />
+  )
 }

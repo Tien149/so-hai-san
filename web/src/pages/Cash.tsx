@@ -3,7 +3,7 @@ import { useApp } from '../lib/app'
 import { supabase, must } from '../lib/supabase'
 import { cap, dm, kg, money, parseMoney } from '../lib/format'
 import { purchaseAmount, saleTotal, type CashEntry, type CashFlow, type PartnerKind, type PayMethod, type Purchase, type Sale } from '../lib/types'
-import { ConfirmButton, Empty, Seg, Tile, useLive } from '../components/ui'
+import { ConfirmButton, Empty, Seg, Tile, useLive, MoneyInput } from '../components/ui'
 
 const CATS = ['đá lạnh', 'bao bì, túi', 'điện nước', 'lương nhân viên', 'mặt bằng', 'xăng xe', 'trả tiền ship', 'gas', 'thu khác']
 
@@ -109,7 +109,7 @@ export default function Cash() {
           <form className="entry" onSubmit={add} autoComplete="off">
             <div className="f c6"><Seg value={dir} onChange={setDir} options={[{ v: 'out', label: 'Chi ra' }, { v: 'in', label: 'Thu vào' }]} /></div>
             <div className="f c3"><label htmlFor="c_cat">Khoản</label><input id="c_cat" list="dl-cats" value={cat} placeholder="đá lạnh" onChange={e => setCat(e.target.value)} /></div>
-            <div className="f c3"><label htmlFor="c_amt">Số tiền</label><input id="c_amt" inputMode="numeric" value={amt} placeholder="50" onChange={e => setAmt(e.target.value)} />
+            <div className="f c3"><label htmlFor="c_amt">Số tiền</label><MoneyInput id="c_amt" value={amt} placeholder="50" onChange={e => setAmt(e.target.value)} />
               <span className="hint">{parseMoney(amt) > 0 ? '= ' + money(parseMoney(amt)) : 'gõ 50 = 50.000đ'}</span></div>
             <div className="f c6"><Seg value={pay} onChange={setPay} options={[{ v: 'cash', label: 'Tiền mặt' }, { v: 'bank', label: 'Chuyển khoản' }]} /></div>
             <div className="f c6"><label htmlFor="c_note">Ghi chú</label><input id="c_note" value={note} onChange={e => setNote(e.target.value)} /></div>

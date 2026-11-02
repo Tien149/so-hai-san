@@ -52,3 +52,18 @@ describe('đọc file sổ cũ', () => {
     expect(suspiciousPrices(rows)).toEqual([{ product: 'sò lông', unit_price: 950000 }])
   })
 })
+
+import { groupDigits, toThousand as tt } from './format'
+describe('ô nhập tiền', () => {
+  it('chấm hàng nghìn khi gõ', () => {
+    expect(groupDigits('270000')).toBe('270.000')
+    expect(groupDigits('1.2345')).toBe('12.345')
+    expect(groupDigits('270')).toBe('270')
+    expect(groupDigits('')).toBe('')
+    expect(groupDigits('0050')).toBe('50')
+    expect(parseMoney(groupDigits('270000'))).toBe(270000)
+    expect(parseMoney(groupDigits('270'))).toBe(270000)
+    expect(parseMoney(groupDigits('20000000'))).toBe(20000000)
+    expect(tt(270000)).toBe('270.000')
+  })
+})
