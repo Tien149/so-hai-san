@@ -1,0 +1,115 @@
+import { useState } from 'react'
+import * as XLSX from 'xlsx'
+import { useApp } from '../lib/app'
+import { supabase, must } from '../lib/supabase'
+import { cap, dm, dmy, kg, money, parseMoney, today, addDays } from '../lib/format'
+import { parseSheets, suspiciousPrices, type ImportResult } from '../lib/excel'
+import type { CashEntry, Purchase, Sale, StockAdj } from '../lib/types'
+
+const CHUNK = 500
+
+export default function Excel() {
+  const app = useApp()
+  const { shop, productName, partnerName } = app
+  const [res, setRes] = useState<ImportResult | null>(null)
+  const [fix, setFix] = useState<Record<string, string>>({})
+  const [busy, setBusy] = useState(false)
+  const [from, setFrom] = useState(addDays(today(), -30))
+  const [to, setTo] = useState(today())
+
+  const read = async (file: File) => {
+    try {
+      const wb = XLSX.read(await file.arrayBuffer(), { cellDates: true })
+      const sheets: Record<string, (string | number | Date | null)[][]> = {}
+      wb.SheetNames.forEach(n => { sheets[n] = XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, raw: true, defval: null }) })
+      setRes(parseSheets(sheets, new Date().getFullYear())); setFix({})
+    } catch { app.toast('Không đọc được file. Hãy chọn file .xlsx') }
+  }
+
+  const suspPurch = res ? suspiciousPrices(res.purchases) : []
+  const flagged = res ? [
+    ...suspiciousPrices(res.sales).map(r => ({ key: 's' + res.sales.indexOf(r), kind: 'Bán', r })),
+    ...res.purchases.filter(r => r.total_price || suspPurch.includes(r)).map(r => ({ key: 'p' + res.purchases.indexOf(r), kind: 'Nhập', r })),
+  ] : []
+
+  const doImport = async () => {
+    if (!shop || !res) return
+    setBusy(true)
+    try {
+      const pid = new Map<string, string>(), cid = new Map<string, string | null>(), sid = new Map<string, string | null>()
+      for (const n of new Set([...res.sales.map(s => s.product), ...res.purchases.map(p => p.product)])) pid.set(n, await app.ensureProduct(n))
+      for (const n of new Set(res.sales.map(s => s.customer))) cid.set(n, await app.ensurePartner('customer', n))
+      for (const n of new Set(res.purchases.map(p => p.supplier))) sid.set(n, await app.ensurePartner('supplier', n))
+      const price = (key: string, v: number) => (fix[key] ? parseMoney(fix[key]) || v : v)
+      const sales = res.sales.map((s, i) => ({ shop_id: shop.id, date: s.date, product_id: pid.get(s.product), customer_id: cid.get(s.customer) ?? null,
+        qty: s.qty, unit_price: price('s' + i, s.unit_price), processing_fee: s.processing_fee, shipping_fee: s.shipping_fee, note: 'nhập từ Excel' }))
+      const buys = res.purchases.map((p, i) => ({ shop_id: shop.id, date: p.date, product_id: pid.get(p.product), supplier_id: sid.get(p.supplier) ?? null,
+        qty: p.qty, unit_price: price('p' + i, p.unit_price), freight: p.freight, size: p.size || null, note: 'nhập từ Excel' }))
+      for (let i = 0; i < buys.length; i += CHUNK) await must(supabase.from('purchases').insert(buys.slice(i, i + CHUNK)))
+      for (let i = 0; i < sales.length; i += CHUNK) await must(supabase.from('sales').insert(sales.slice(i, i + CHUNK)))
+      app.toast(`Đã nhập ${sales.length} dòng bán, ${buys.length} dòng nhập`); setRes(null)
+    } catch (e) { app.fail(e) } finally { setBusy(false) }
+  }
+
+  const doExport = async () => {
+    if (!shop) return
+    setBusy(true)
+    try {
+      const q = <T,>(t: string) => must(supabase.from(t).select('*').eq('shop_id', shop.id).gte('date', from).lte('date', to).order('date').order('created_at').limit(50000)) as Promise<T[]>
+      const [s, p, c, a] = await Promise.all([q<Sale>('sales'), q<Purchase>('purchases'), q<CashEntry>('cash_entries'), q<StockAdj>('stock_adjustments')])
+      const pnl = await must(supabase.rpc('daily_pnl', { p_shop: shop.id, p_from: from, p_to: to })) as Record<string, number | string>[]
+      const pay = (x: { paid: boolean; pay_method: string }) => !x.paid ? 'Nợ' : x.pay_method === 'bank' ? 'Chuyển khoản' : 'Tiền mặt'
+      const wb = XLSX.utils.book_new()
+      const add = (name: string, rows: (string | number | null)[][]) => { const ws = XLSX.utils.aoa_to_sheet(rows); ws['!cols'] = rows[0].map(() => ({ wch: 14 })); XLSX.utils.book_append_sheet(wb, ws, name) }
+      add('Tổng hợp ngày', [['Ngày', 'Doanh thu', 'Chế biến + ship', 'Giá vốn', 'Hao hụt', 'Thu khác', 'Chi khác', 'Nhập hàng', 'Cước', 'Lãi ròng'],
+        ...pnl.filter(d => Number(d.revenue) || Number(d.purchases) || Number(d.other_out)).map(d => [dmy(String(d.day)), Math.round(+d.revenue), +d.service, Math.round(+d.cogs), Math.round(+d.loss), +d.other_in, +d.other_out, Math.round(+d.purchases), +d.freight, Math.round(+d.net)])])
+      add('Bán hàng', [['Ngày', 'Khách', 'Món', 'Size', 'Số kg', 'Đơn giá', 'Thành tiền', 'Chế biến', 'Ship', 'Thanh toán', 'Ngày trả', 'Ghi chú'],
+        ...s.map(x => [dmy(x.date), cap(partnerName(x.customer_id)), cap(productName(x.product_id)), x.size, +x.qty, +x.unit_price, Math.round(+x.qty * +x.unit_price), +x.processing_fee, +x.shipping_fee, pay(x), x.paid_at ? dmy(x.paid_at) : '', x.note])])
+      add('Nhập hàng', [['Ngày', 'Món', 'Size', 'Số kg', 'Giá/kg', 'Thành tiền', 'Cước xe + bãi', 'Mối hàng', 'Thanh toán', 'Ngày trả', 'Ghi chú'],
+        ...p.map(x => [dmy(x.date), cap(productName(x.product_id)), x.size, +x.qty, +x.unit_price, Math.round(+x.qty * +x.unit_price), +x.freight, cap(partnerName(x.supplier_id)), pay(x), x.paid_at ? dmy(x.paid_at) : '', x.note])])
+      add('Thu chi khác', [['Ngày', 'Loại', 'Khoản', 'Số tiền', 'Hình thức', 'Ghi chú'],
+        ...c.map(x => [dmy(x.date), x.direction === 'in' ? 'Thu' : 'Chi', cap(x.category), +x.amount, x.pay_method === 'bank' ? 'Chuyển khoản' : 'Tiền mặt', x.note])])
+      add('Hao hụt', [['Ngày', 'Món', 'Kg', 'Ghi chú'], ...a.map(x => [dmy(x.date), cap(productName(x.product_id)), +x.qty, x.note])])
+      XLSX.writeFile(wb, `so-hai-san-${from}-den-${to}.xlsx`)
+    } catch (e) { app.fail(e) } finally { setBusy(false) }
+  }
+
+  return (
+    <>
+      <h1>Nhập / xuất Excel</h1>
+      <div className="card stack">
+        <b>Chuyển sổ Excel cũ vào app</b>
+        <span className="sub">Nhận mẫu file nhập hàng (ngày, tên hàng, size, thành tiền, số lượng, cước xe + bãi, giá/kg, tên nguồn) và file bán hàng (ngày, tên khách, tên sản phẩm, số lượng, đơn giá, tiền chế biến, tiền ship). Ô trống được hiểu là giống dòng trên.</span>
+        <input type="file" accept=".xlsx,.xls" aria-label="Chọn file Excel" onChange={e => e.target.files?.[0] && void read(e.target.files[0])} />
+        {res && (
+          <div className="stack">
+            <div>Tìm thấy <b>{res.sales.length}</b> dòng bán và <b>{res.purchases.length}</b> dòng nhập
+              {(() => { const d = [...new Set([...res.sales, ...res.purchases].map(x => x.date))].sort(); return d.length ? `, từ ${dm(d[0])} đến ${dm(d[d.length - 1])}` : '' })()}.
+              {res.skipped > 0 && <span className="sub"> Bỏ qua {res.skipped} dòng thiếu số lượng hoặc giá.</span>}</div>
+            <div className="sub">{res.sheets.join(' · ')}</div>
+            {flagged.length > 0 && (
+              <div className="note stack">
+                <b>Các dòng giá lệch nhiều so với bình thường, có thể gõ nhầm. Sửa giá nếu cần (gõ theo nghìn):</b>
+                {flagged.map(({ key, kind, r }) => (
+                  <div key={key} className="row-actions">
+                    <span style={{ flex: 1, minWidth: 180 }}>{kind} {dm(r.date)}: {cap(r.product)} {kg(r.qty)}kg × {money(r.unit_price)}
+                      {'total_price' in r && r.total_price ? <span className="sub"> · cột thành tiền ÷ kg ra {money(r.total_price)}/kg, có thể sai giá hoặc sai số kg</span> : null}</span>
+                    <input aria-label="Giá đúng" inputMode="numeric" placeholder="giá đúng" style={{ width: 120 }} value={fix[key] || ''} onChange={e => setFix({ ...fix, [key]: e.target.value })} />
+                  </div>))}
+              </div>)}
+            <div className="row-actions"><button type="button" className="btn" disabled={busy || !(res.sales.length + res.purchases.length)} onClick={() => void doImport()}>{busy ? 'Đang nhập…' : 'Nhập vào sổ'}</button>
+              <button type="button" className="btn ghost" onClick={() => setRes(null)}>Hủy</button></div>
+            <p className="sub" style={{ margin: 0 }}>Các dòng cũ được tính là đã trả tiền mặt. Nếu khách còn nợ, mở ngày đó và sửa lại.</p>
+          </div>)}
+      </div>
+      <div className="card stack">
+        <b>Xuất sổ ra Excel</b>
+        <div className="row-actions">
+          <input type="date" aria-label="Từ ngày" value={from} onChange={e => setFrom(e.target.value)} style={{ width: 'auto' }} /> đến
+          <input type="date" aria-label="Đến ngày" value={to} onChange={e => setTo(e.target.value)} style={{ width: 'auto' }} />
+          <button type="button" className="btn" disabled={busy} onClick={() => void doExport()}>Tải file Excel</button>
+        </div>
+      </div>
+    </>
+  )
+}

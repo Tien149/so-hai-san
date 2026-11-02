@@ -537,3 +537,11 @@ grant select, insert, update, delete on public.shops, public.shop_members, publi
   public.purchases, public.sales, public.cash_entries, public.stock_adjustments to authenticated;
 grant select on public.audit_log to authenticated;
 revoke insert, update, delete on public.audit_log from authenticated, anon;
+
+-- Cập nhật tức thời giữa các máy (Supabase Realtime)
+do $$
+begin
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
+    alter publication supabase_realtime add table public.sales, public.purchases, public.cash_entries, public.stock_adjustments, public.products, public.partners;
+  end if;
+end $$;
