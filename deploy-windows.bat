@@ -15,6 +15,12 @@ echo Lan dau trinh duyet se mo trang Netlify: dang nhap roi bam "Authorize". Cac
 call npx -y netlify-cli deploy --prod --dir dist --site 3218624e-fcc9-4f52-aeba-6ef8f417bf7e
 if errorlevel 1 (
   echo.
+  echo Can dang nhap Netlify. Trinh duyet se mo, dang nhap dung tai khoan Netlify cua quan roi bam "Authorize".
+  call npx -y netlify-cli login
+  call npx -y netlify-cli deploy --prod --dir dist --site 3218624e-fcc9-4f52-aeba-6ef8f417bf7e
+)
+if errorlevel 1 (
+  echo.
   echo Tu dong dua len khong duoc. Cach tay: keo thu muc "dist" vua mo vao trang Netlify vua mo.
   start "" "%~dp0web\dist"
   start https://app.netlify.com/projects/so-hai-san/deploys
