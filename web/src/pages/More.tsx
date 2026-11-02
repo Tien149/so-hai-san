@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useApp } from '../lib/app'
-import { supabase } from '../lib/supabase'
+import { supabase, showLogin } from '../lib/supabase'
 
 export default function More() {
   const { isManager, role, session } = useApp()
@@ -16,7 +16,7 @@ export default function More() {
         <Link to="/cai-dat">Cài đặt quán <span>tên, số điện thoại, tiền mặt ban đầu</span></Link>
       </div>
       <div className="card stack">
-        <div className="sub">Đang đăng nhập: {session?.user.email}</div>
+        <div className="sub">Đang đăng nhập: {showLogin(session?.user.email)}</div>
         <div><button type="button" className="btn ghost" onClick={() => void supabase.auth.signOut()}>Đăng xuất</button></div>
       </div>
       <p className="sub">Cài app lên điện thoại: mở trang này bằng Chrome (Android) và chọn "Cài đặt ứng dụng", hoặc Safari (iPhone), bấm Chia sẻ rồi "Thêm vào MH chính".</p>

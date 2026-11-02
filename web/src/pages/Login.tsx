@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { supabase, errText, configured } from '../lib/supabase'
+import { supabase, errText, configured, toLoginEmail } from '../lib/supabase'
 
 export default function Login() {
   const [mode, setMode] = useState<'in' | 'up' | 'reset'>('in')
@@ -13,7 +13,7 @@ export default function Login() {
     e.preventDefault(); setMsg(null); setBusy(true)
     try {
       if (mode === 'in') {
-        const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password: pw })
+        const { error } = await supabase.auth.signInWithPassword({ email: toLoginEmail(email), password: pw })
         if (error) throw error
       } else if (mode === 'up') {
         if (pw.length < 6) throw new Error('Mật khẩu cần ít nhất 6 ký tự')
@@ -34,7 +34,7 @@ export default function Login() {
         <div className="logo"><img src="/icon.svg" alt="" /><div><h1>Sổ Hải Sản</h1><div className="sub">Bán hàng, nhập hàng, kho và lời lỗ cho quán hải sản</div></div></div>
         {!configured && <p className="note">Chưa cấu hình máy chủ. Điền VITE_SUPABASE_URL và VITE_SUPABASE_ANON_KEY vào file .env.</p>}
         {mode === 'up' && <div className="f"><label htmlFor="l_name">Họ tên</label><input id="l_name" value={name} onChange={e => setName(e.target.value)} autoComplete="name" /></div>}
-        <div className="f"><label htmlFor="l_email">Email</label><input id="l_email" type="email" required value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" /></div>
+        <div className="f"><label htmlFor="l_email">{mode === 'in' ? 'Tên đăng nhập hoặc email' : 'Email'}</label><input id="l_email" type={mode === 'in' ? 'text' : 'email'} required value={email} onChange={e => setEmail(e.target.value)} autoComplete="username" autoCapitalize="none" spellCheck={false} /></div>
         {mode !== 'reset' && <div className="f"><label htmlFor="l_pw">Mật khẩu</label><input id="l_pw" type="password" required value={pw} onChange={e => setPw(e.target.value)} autoComplete={mode === 'up' ? 'new-password' : 'current-password'} /></div>}
         {msg && <p className="note">{msg}</p>}
         <button className="btn" type="submit" disabled={busy}>{mode === 'in' ? 'Đăng nhập' : mode === 'up' ? 'Tạo tài khoản' : 'Gửi email đặt lại'}</button>

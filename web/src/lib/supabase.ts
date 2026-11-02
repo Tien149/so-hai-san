@@ -25,3 +25,12 @@ export async function must<T>(p: PromiseLike<{ data: T; error: unknown }>): Prom
   if (error) throw error
   return data
 }
+
+/** Tài khoản đăng nhập bằng tên (không có email) được lưu dưới dạng ten@sohaisan.local */
+export const LOGIN_DOMAIN = 'sohaisan.local'
+export const toLoginEmail = (id: string) => {
+  const v = id.trim().toLowerCase()
+  return v.includes('@') ? v : `${v}@${LOGIN_DOMAIN}`
+}
+export const showLogin = (email: string | null | undefined) =>
+  email && email.endsWith('@' + LOGIN_DOMAIN) ? email.slice(0, -LOGIN_DOMAIN.length - 1) : email || ''

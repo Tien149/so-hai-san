@@ -2,7 +2,7 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useApp } from '../lib/app'
 import { addDays, dm, dow, today } from '../lib/format'
 import { ROLE_LABEL } from '../lib/types'
-import { supabase } from '../lib/supabase'
+import { supabase, showLogin } from '../lib/supabase'
 
 const DATED = ['/', '/nhap', '/kho', '/so-tien']
 
@@ -47,7 +47,7 @@ export default function Layout() {
           <NavLink to="/cai-dat">{icons.gear}Cài đặt quán</NavLink>
         </nav>
         <div className="side-foot">
-          <span title={session?.user.email}>{session?.user.email}</span>
+          <span title={showLogin(session?.user.email)}>{showLogin(session?.user.email)}</span>
           <button type="button" onClick={() => void supabase.auth.signOut()}>{icons.logout}Đăng xuất</button>
         </div>
       </aside>
