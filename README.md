@@ -48,6 +48,14 @@ Cách tính:
 - Android: mở link bằng Chrome → menu ⋮ → **Cài đặt ứng dụng**.
 - iPhone: mở bằng Safari → nút Chia sẻ → **Thêm vào MH chính**.
 
+## Chạy thử trên máy (không cần deploy)
+
+1. Cài Node.js bản LTS từ https://nodejs.org (chỉ làm một lần).
+2. Giải nén thư mục này, bấm đúp `chay-thu-windows.bat` (Windows) hoặc `chay-thu-mac.command` (Mac).
+3. Lần đầu đợi 1–3 phút cài thư viện, sau đó trình duyệt tự mở http://localhost:5173.
+
+Bản chạy thử dùng chung máy chủ dữ liệu với bản thật (cấu hình trong `web/.env.development`), nên khi thử hãy tạo một quán riêng tên "Quán thử" để không lẫn số liệu. Điện thoại cùng wifi mở địa chỉ "Network" hiện trong cửa sổ đen.
+
 ## Chạy trên máy để phát triển
 
 ```sh
