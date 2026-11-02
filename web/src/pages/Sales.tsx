@@ -4,6 +4,7 @@ import { supabase, must } from '../lib/supabase'
 import { addDays, cap, dm, kg, money, parseMoney, parseNum, short, toThousand } from '../lib/format'
 import { saleAmount, saleTotal, type PayMethod, type Sale } from '../lib/types'
 import { ConfirmButton, Empty, PayPill, Seg, Tile, useLive, MoneyInput } from '../components/ui'
+import { Combo } from '../components/Combo'
 
 type Pay = PayMethod | 'debt'
 const blank = { product: '', customer: '', qty: '', price: '', cb: '', ship: '', size: '', note: '', pay: 'cash' as Pay }
@@ -47,6 +48,21 @@ export default function Sales() {
     recent.forEach(r => c.set(r.product_id, (c.get(r.product_id) || 0) + 1))
     return [...c.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12).map(e => e[0])
   }, [recent])
+
+  const productOpts = useMemo(() => {
+    const rank = new Map(top.map((id, i) => [id, i]))
+    return [...products]
+      .sort((a, b) => (rank.get(a.id) ?? 999) - (rank.get(b.id) ?? 999) || a.name.localeCompare(b.name, 'vi'))
+      .map(p => { const lp = lastPrice.get(p.id) || p.default_sell_price; return { value: p.name, hint: lp ? short(lp) : undefined } })
+  }, [products, top, lastPrice])
+  const customerOpts = useMemo(() => partners.filter(p => p.kind === 'customer')
+    .sort((a, b) => a.name.localeCompare(b.name, 'vi')).map(p => ({ value: p.name, hint: p.phone || undefined })), [partners])
+  const choose = (name: string) => {
+    const p = products.find(x => x.name === name)
+    const lp = p && (lastPrice.get(p.id) || p.default_sell_price)
+    setF(s => ({ ...s, product: name, price: lp ? toThousand(lp) : s.price }))
+    setTimeout(() => qtyRef.current?.focus())
+  }
 
   const qty = parseNum(f.qty), price = parseMoney(f.price), cb = parseMoney(f.cb) || 0, ship = parseMoney(f.ship) || 0
   const total = qty > 0 && price > 0 ? qty * price + cb + ship : 0
@@ -167,10 +183,11 @@ export default function Sales() {
             </div></div>
           )}
           <div className="f c3"><label htmlFor="s_prod">Món</label>
-            <input id="s_prod" ref={prodRef} list="dl-products" value={f.product} placeholder="ốc hương"
-              onChange={set('product')} onBlur={e => pickProduct(e.target.value.trim().toLowerCase())} /></div>
+            <Combo id="s_prod" inputRef={prodRef} value={f.product} placeholder="ốc hương" newLabel="Món mới" options={productOpts}
+              onChange={v => setF(s => ({ ...s, product: v }))} onPick={choose} onBlur={v => pickProduct(v.trim().toLowerCase())} /></div>
           <div className="f c3"><label htmlFor="s_cust">Khách</label>
-            <input id="s_cust" list="dl-customers" value={f.customer} placeholder="khách lẻ" onChange={set('customer')} /></div>
+            <Combo id="s_cust" value={f.customer} placeholder="khách lẻ" newLabel="Khách mới" options={customerOpts}
+              onChange={v => setF(s => ({ ...s, customer: v }))} onPick={() => setTimeout(() => qtyRef.current?.focus())} /></div>
           <div className="f c2"><label htmlFor="s_qty">Số kg</label>
             <input id="s_qty" ref={qtyRef} inputMode="decimal" value={f.qty} placeholder="1,5" onChange={set('qty')} /></div>
           <div className="f c2"><label htmlFor="s_price">Giá / kg</label>
@@ -223,8 +240,6 @@ export default function Sales() {
         {billText && <><pre className="bill">{billText}</pre><div><button type="button" className="btn sm" onClick={copyBill}>Sao chép để gửi Zalo</button></div></>}
       </div>
 
-      <datalist id="dl-products">{products.map(p => <option key={p.id} value={p.name} />)}</datalist>
-      <datalist id="dl-customers">{partners.filter(p => p.kind === 'customer').map(p => <option key={p.id} value={p.name} />)}</datalist>
     </>
   )
 }

@@ -4,6 +4,7 @@ import { supabase, must } from '../lib/supabase'
 import { cap, dm, kg, money, parseMoney, parseNum, short, toThousand } from '../lib/format'
 import { purchaseAmount, type PayMethod, type Purchase } from '../lib/types'
 import { ConfirmButton, Empty, PayPill, Seg, Tile, useLive, MoneyInput } from '../components/ui'
+import { Combo } from '../components/Combo'
 
 type Pay = PayMethod | 'debt'
 const blank = { product: '', supplier: '', size: '', qty: '', price: '', freight: '', note: '', pay: 'cash' as Pay }
@@ -104,9 +105,13 @@ export default function Purchases() {
       <div className="card">
         <form className="entry" onSubmit={submit} autoComplete="off">
           <div className="f c3"><label htmlFor="b_prod">Tên hàng</label>
-            <input id="b_prod" ref={prodRef} list="dl-products" value={f.product} placeholder="ghẹ" onChange={set('product')} onBlur={e => void suggest(e.target.value)} /></div>
+            <Combo id="b_prod" inputRef={prodRef} value={f.product} placeholder="ghẹ" newLabel="Hàng mới"
+              options={products.map(p => ({ value: p.name }))} onChange={v => setF(s => ({ ...s, product: v }))}
+              onPick={v => void suggest(v)} onBlur={v => void suggest(v)} /></div>
           <div className="f c3"><label htmlFor="b_src">Mối hàng</label>
-            <input id="b_src" list="dl-suppliers" value={f.supplier} placeholder="vũ ghẹ" onChange={set('supplier')} /></div>
+            <Combo id="b_src" value={f.supplier} placeholder="vũ ghẹ" newLabel="Mối mới"
+              options={partners.filter(p => p.kind === 'supplier').map(p => ({ value: p.name, hint: p.phone || undefined }))}
+              onChange={v => setF(s => ({ ...s, supplier: v }))} /></div>
           <div className="f c2"><label htmlFor="b_size">Size</label><input id="b_size" value={f.size} placeholder="3-4 con" onChange={set('size')} /></div>
           <div className="f c2"><label htmlFor="b_qty">Số kg</label><input id="b_qty" inputMode="decimal" value={f.qty} onChange={set('qty')} /></div>
           <div className="f c2"><label htmlFor="b_price">Giá nhập / kg</label><MoneyInput id="b_price" value={f.price} placeholder="400" onChange={set('price')} />
@@ -139,8 +144,6 @@ export default function Purchases() {
             <tfoot><tr><td>{rows.length} dòng</td><td></td><td className="r">{kg(sum.q)}</td><td></td><td className="r">{short(sum.fr)}</td><td className="r">{money(sum.amt)}</td><td></td></tr></tfoot>
           </table>)}
       </div></div>
-      <datalist id="dl-products">{products.map(p => <option key={p.id} value={p.name} />)}</datalist>
-      <datalist id="dl-suppliers">{partners.filter(p => p.kind === 'supplier').map(p => <option key={p.id} value={p.name} />)}</datalist>
     </>
   )
 }

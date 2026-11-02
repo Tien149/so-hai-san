@@ -92,3 +92,19 @@ pre.bill{white-space:pre-wrap;font:500 14px/1.5 var(--f);background:var(--bg);bo
 .diff{font-size:13px;display:grid;gap:2px}
 .diff del{color:var(--coral)} .diff ins{color:var(--good);text-decoration:none}
 @media (prefers-reduced-motion:no-preference){.toast{animation:pop .18s ease-out}@keyframes pop{from{opacity:0;transform:translate(-50%,8px)}}}
+
+/* Ô gõ có gợi ý */
+.combo{position:relative}
+.combo>input{padding-right:40px}
+.combo-btn{position:absolute;right:5px;top:50%;transform:translateY(-50%);width:32px;height:32px;border:0;border-radius:8px;background:transparent;color:var(--muted);display:grid;place-items:center;cursor:pointer;padding:0}
+.combo-btn:hover{background:var(--sea-soft);color:var(--sea)}
+.combo-list{position:absolute;z-index:40;left:0;right:0;top:calc(100% + 6px);margin:0;padding:6px;list-style:none;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 14px 34px rgba(10,40,38,.18);max-height:min(300px,50vh);overflow:auto;overscroll-behavior:contain}
+.combo-list li{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border-radius:8px;cursor:pointer;font:500 15px var(--f);color:var(--ink)}
+.combo-list li.on{background:var(--sea-soft)}
+.combo-list li+li{margin-top:2px}
+.combo-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.combo-list mark{background:none;color:var(--sea);font-weight:700}
+.combo-hint{flex:none;font-size:13px;font-weight:600;color:var(--muted);font-variant-numeric:tabular-nums}
+.combo-list li.combo-new{display:block;cursor:default;font-size:13px;color:var(--muted);border-top:1px dashed var(--line);border-radius:0;margin-top:4px;padding-top:10px}
+.combo-list li.combo-new:first-child{border-top:0;margin-top:0}
+.combo-new b{color:var(--ink);font-weight:700}

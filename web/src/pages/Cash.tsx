@@ -4,6 +4,7 @@ import { supabase, must } from '../lib/supabase'
 import { cap, dm, kg, money, parseMoney } from '../lib/format'
 import { purchaseAmount, saleTotal, type CashEntry, type CashFlow, type PartnerKind, type PayMethod, type Purchase, type Sale } from '../lib/types'
 import { ConfirmButton, Empty, Seg, Tile, useLive, MoneyInput } from '../components/ui'
+import { Combo } from '../components/Combo'
 
 const CATS = ['đá lạnh', 'bao bì, túi', 'điện nước', 'lương nhân viên', 'mặt bằng', 'xăng xe', 'trả tiền ship', 'gas', 'thu khác']
 
@@ -108,14 +109,13 @@ export default function Cash() {
         <div className="card"><h2 style={{ margin: '0 0 8px' }}>Ghi thu / chi khác</h2>
           <form className="entry" onSubmit={add} autoComplete="off">
             <div className="f c6"><Seg value={dir} onChange={setDir} options={[{ v: 'out', label: 'Chi ra' }, { v: 'in', label: 'Thu vào' }]} /></div>
-            <div className="f c3"><label htmlFor="c_cat">Khoản</label><input id="c_cat" list="dl-cats" value={cat} placeholder="đá lạnh" onChange={e => setCat(e.target.value)} /></div>
+            <div className="f c3"><label htmlFor="c_cat">Khoản</label><Combo id="c_cat" value={cat} placeholder="đá lạnh" options={CATS.map(c => ({ value: c }))} onChange={setCat} /></div>
             <div className="f c3"><label htmlFor="c_amt">Số tiền</label><MoneyInput id="c_amt" value={amt} placeholder="50" onChange={e => setAmt(e.target.value)} />
               <span className="hint">{parseMoney(amt) > 0 ? '= ' + money(parseMoney(amt)) : 'gõ 50 = 50.000đ'}</span></div>
             <div className="f c6"><Seg value={pay} onChange={setPay} options={[{ v: 'cash', label: 'Tiền mặt' }, { v: 'bank', label: 'Chuyển khoản' }]} /></div>
             <div className="f c6"><label htmlFor="c_note">Ghi chú</label><input id="c_note" value={note} onChange={e => setNote(e.target.value)} /></div>
             <div className="c6"><button className="btn" type="submit">Lưu</button></div>
           </form>
-          <datalist id="dl-cats">{CATS.map(c => <option key={c} value={c} />)}</datalist>
         </div>
       </div>
       <div className="card"><div className="tw">
