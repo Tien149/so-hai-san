@@ -12,12 +12,12 @@ echo /*  /index.html  200> dist\_redirects
 echo.
 echo [2/2] Dang dua len Netlify...
 echo Lan dau trinh duyet se mo trang Netlify: dang nhap roi bam "Authorize". Cac lan sau tu chay.
-call npx -y netlify-cli deploy --prod --dir dist --site 3218624e-fcc9-4f52-aeba-6ef8f417bf7e
+call npx -y netlify-cli deploy --prod --no-build --dir dist --site 3218624e-fcc9-4f52-aeba-6ef8f417bf7e
 if errorlevel 1 (
   echo.
   echo Can dang nhap Netlify. Trinh duyet se mo, dang nhap dung tai khoan Netlify cua quan roi bam "Authorize".
   call npx -y netlify-cli login
-  call npx -y netlify-cli deploy --prod --dir dist --site 3218624e-fcc9-4f52-aeba-6ef8f417bf7e
+  call npx -y netlify-cli deploy --prod --no-build --dir dist --site 3218624e-fcc9-4f52-aeba-6ef8f417bf7e
 )
 if errorlevel 1 (
   echo.
