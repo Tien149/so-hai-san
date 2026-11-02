@@ -8,7 +8,7 @@ if errorlevel 1 (
   pause
   exit /b
 )
-if not exist node_modules (
+if not exist node_modules\.bin\vite.cmd (
   echo Lan dau: dang cai thu vien, doi 1-3 phut...
   call npm install
   if errorlevel 1 ( echo Cai thu vien bi loi. Chup man hinh gui lai nhe. & pause & exit /b )

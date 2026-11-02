@@ -3,7 +3,7 @@ title So Hai San - dong goi va dua len mang
 cd /d "%~dp0web"
 where node >nul 2>nul
 if errorlevel 1 ( echo Chua co Node.js. Cai tai https://nodejs.org roi chay lai. & pause & exit /b )
-if not exist node_modules ( call npm install )
+if not exist node_modules\.bin\vite.cmd ( echo Dang cai thu vien... & call npm install )
 echo.
 echo [1/2] Dang dong goi app...
 call npm run build
