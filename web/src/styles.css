@@ -108,3 +108,13 @@ pre.bill{white-space:pre-wrap;font:500 14px/1.5 var(--f);background:var(--bg);bo
 .combo-list li.combo-new{display:block;cursor:default;font-size:13px;color:var(--muted);border-top:1px dashed var(--line);border-radius:0;margin-top:4px;padding-top:10px}
 .combo-list li.combo-new:first-child{border-top:0;margin-top:0}
 .combo-new b{color:var(--ink);font-weight:700}
+.chip.add{border-style:dashed;color:var(--sea)}
+
+/* Shipper */
+.month-nav{justify-content:center;gap:14px;font-size:16px}
+.ship-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.ship-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.ship-head .pill{margin-left:4px;vertical-align:middle}
+.ship.off{opacity:.7}
+input.fee-in{width:110px;text-align:right;padding:6px 8px;font-size:14px}
+.chip.on .sub{color:inherit;opacity:.85}

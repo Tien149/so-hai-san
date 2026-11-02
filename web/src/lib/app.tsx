@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase, must, errText } from './supabase'
-import type { Membership, Partner, PartnerKind, Product, Role, Shop } from './types'
+import type { Membership, Partner, PartnerKind, Product, Role, Shipper, Shop } from './types'
 import { normName, today } from './format'
 
 interface AppCtx {
@@ -15,6 +15,8 @@ interface AppCtx {
   reloadShops: () => Promise<void>
   products: Product[]
   partners: Partner[]
+  shippers: Shipper[]
+  shipperName: (id: string | null | undefined) => string
   reloadCatalog: () => Promise<void>
   ensureProduct: (name: string) => Promise<string>
   ensurePartner: (kind: PartnerKind, name: string) => Promise<string | null>
@@ -44,6 +46,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [shopId, setShopIdState] = useState<string | null>(lsGet(LS_SHOP))
   const [products, setProducts] = useState<Product[]>([])
   const [partners, setPartners] = useState<Partner[]>([])
+  const [shippers, setShippers] = useState<Shipper[]>([])
   const [day, setDay] = useState(today())
   const [toastMsg, setToastMsg] = useState<string | null>(null)
   const toastTimer = useRef<number | undefined>(undefined)
@@ -79,13 +82,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const setShopId = useCallback((id: string) => { setShopIdState(id); lsSet(LS_SHOP, id) }, [])
 
   const reloadCatalog = useCallback(async () => {
-    if (!shop) { setProducts([]); setPartners([]); return }
+    if (!shop) { setProducts([]); setPartners([]); setShippers([]); return }
     try {
-      const [p, q] = await Promise.all([
+      const [p, q, s] = await Promise.all([
         must(supabase.from('products').select('*').eq('shop_id', shop.id).order('name')),
         must(supabase.from('partners').select('*').eq('shop_id', shop.id).order('name')),
+        must(supabase.from('shippers').select('*').eq('shop_id', shop.id).order('name')),
       ])
-      setProducts(p as Product[]); setPartners(q as Partner[])
+      setProducts(p as Product[]); setPartners(q as Partner[]); setShippers(s as Shipper[])
     } catch (e) { fail(e) }
   }, [shop, fail])
   useEffect(() => { void reloadCatalog() }, [reloadCatalog])
@@ -111,10 +115,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const pMap = useMemo(() => new Map(products.map(p => [p.id, p.name])), [products])
   const qMap = useMemo(() => new Map(partners.map(p => [p.id, p.name])), [partners])
+  const sMap = useMemo(() => new Map(shippers.map(p => [p.id, p.name])), [shippers])
 
   const value: AppCtx = {
     session, ready, memberships, shop, role, isManager: role === 'owner' || role === 'manager',
-    setShopId, reloadShops, products, partners, reloadCatalog, ensureProduct, ensurePartner,
+    setShopId, reloadShops, products, partners, shippers, reloadCatalog,
+    shipperName: id => (id && sMap.get(id)) || '', ensureProduct, ensurePartner,
     productName: id => (id && pMap.get(id)) || '',
     partnerName: id => (id && qMap.get(id)) || '',
     day, setDay, toast, fail,

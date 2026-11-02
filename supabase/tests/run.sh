@@ -7,3 +7,4 @@ D=$(cd "$(dirname "$0")/.." && pwd)
 su postgres -c "psql -q -v ON_ERROR_STOP=1 -d $DB -f $D/tests/stub_auth.sql"
 for f in $(ls $D/migrations/*.sql | sort); do su postgres -c "psql -q -v ON_ERROR_STOP=1 -d $DB -f $f"; done
 su postgres -c "psql -d $DB -f $D/tests/rls_test.sql"
+su postgres -c "psql -d $DB -f $D/tests/shipper_test.sql"

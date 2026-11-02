@@ -14,6 +14,7 @@ import Members from './pages/Members'
 import AuditLog from './pages/AuditLog'
 import Catalog from './pages/Catalog'
 import Settings from './pages/Settings'
+import Shippers from './pages/Shippers'
 const Excel = lazy(() => import('./pages/Excel'))
 
 function Gate() {
@@ -33,6 +34,7 @@ function Gate() {
           <Route path="them" element={<More />} />
           <Route path="nhan-vien" element={<Members />} />
           <Route path="danh-muc" element={<Catalog />} />
+          <Route path="shipper" element={<Shippers />} />
           <Route path="cai-dat" element={<Settings />} />
           {isManager && <Route path="nhat-ky" element={<AuditLog />} />}
           {isManager && <Route path="excel" element={<Suspense fallback={<span className="sub">Đang tải…</span>}><Excel /></Suspense>} />}

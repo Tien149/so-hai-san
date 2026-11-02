@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import { useApp } from '../lib/app'
 import { supabase, must } from '../lib/supabase'
 import { addDays, cap, dm, kg, money, parseMoney, parseNum, short, toThousand } from '../lib/format'
@@ -7,11 +8,11 @@ import { ConfirmButton, Empty, PayPill, Seg, Tile, useLive, MoneyInput } from '.
 import { Combo } from '../components/Combo'
 
 type Pay = PayMethod | 'debt'
-const blank = { product: '', customer: '', qty: '', price: '', cb: '', ship: '', size: '', note: '', pay: 'cash' as Pay }
+const blank = { product: '', customer: '', qty: '', price: '', cb: '', ship: '', size: '', note: '', pay: 'cash' as Pay, shipper: '' }
 
 export default function Sales() {
   const app = useApp()
-  const { shop, day, products, partners, productName, partnerName, session, isManager } = app
+  const { shop, day, products, partners, shippers, productName, partnerName, shipperName, session, isManager } = app
   const [rows, setRows] = useState<Sale[]>([])
   const [loading, setLoading] = useState(true)
   const [recent, setRecent] = useState<{ product_id: string; unit_price: number }[]>([])
@@ -57,6 +58,7 @@ export default function Sales() {
   }, [products, top, lastPrice])
   const customerOpts = useMemo(() => partners.filter(p => p.kind === 'customer')
     .sort((a, b) => a.name.localeCompare(b.name, 'vi')).map(p => ({ value: p.name, hint: p.phone || undefined })), [partners])
+  const activeShippers = useMemo(() => shippers.filter(s => s.active || s.id === f.shipper), [shippers, f.shipper])
   const choose = (name: string) => {
     const p = products.find(x => x.name === name)
     const lp = p && (lastPrice.get(p.id) || p.default_sell_price)
@@ -87,6 +89,7 @@ export default function Sales() {
         product_id, customer_id, qty, unit_price: price, processing_fee: cb, shipping_fee: ship,
         size: f.size.trim() || null, note: f.note.trim() || null,
         pay_method: (f.pay === 'debt' ? 'cash' : f.pay) as PayMethod, paid: f.pay !== 'debt',
+        shipper_id: f.shipper || null,
       }
       if (editId) {
         const old = rows.find(r => r.id === editId)
@@ -99,7 +102,7 @@ export default function Sales() {
         await must(supabase.from('sales').insert({ ...rec, shop_id: shop.id, date: day }))
         app.toast(`Đã lưu ${cap(f.product)} ${kg(qty)}kg`)
       }
-      setF(s => ({ ...blank, customer: editId ? '' : s.customer, pay: editId ? 'cash' : s.pay }))
+      setF(s => ({ ...blank, customer: editId ? '' : s.customer, pay: editId ? 'cash' : s.pay, shipper: editId ? '' : s.shipper }))
       setEditId(null)
       await load()
       prodRef.current?.focus()
@@ -111,7 +114,7 @@ export default function Sales() {
     setF({
       product: productName(s.product_id), customer: partnerName(s.customer_id), qty: String(s.qty).replace('.', ','),
       price: toThousand(s.unit_price), cb: toThousand(s.processing_fee), ship: toThousand(s.shipping_fee),
-      size: s.size || '', note: s.note || '', pay: s.paid ? s.pay_method : 'debt',
+      size: s.size || '', note: s.note || '', pay: s.paid ? s.pay_method : 'debt', shipper: s.shipper_id || '',
     })
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -200,6 +203,17 @@ export default function Sales() {
             <MoneyInput id="s_ship" value={f.ship} placeholder="0" onChange={set('ship')} /></div>
           <div className="f c2"><label htmlFor="s_size">Size / ghi chú</label>
             <input id="s_size" value={f.size} placeholder="70-80 con" onChange={set('size')} /></div>
+          {(activeShippers.length > 0 || isManager) && (
+            <div className="f c6"><label>Người giao</label><div className="chips">
+              <button type="button" className={'chip' + (!f.shipper ? ' on' : '')} onClick={() => setF(s => ({ ...s, shipper: '' }))}>Khách tự lấy</button>
+              {activeShippers.map(sh => (
+                <button type="button" key={sh.id} className={'chip' + (f.shipper === sh.id ? ' on' : '')} onClick={() => setF(s => ({ ...s, shipper: s.shipper === sh.id ? '' : sh.id }))}>
+                  {cap(sh.name)} <span className="sub">{sh.kind === 'staff' ? 'nhà' : sh.per_order_fee ? short(sh.per_order_fee) + '/đơn' : 'ngoài'}</span>
+                </button>
+              ))}
+              {isManager && <Link className="chip add" to="/shipper">+ Thêm shipper</Link>}
+            </div></div>
+          )}
           <div className="f c6"><label>Thanh toán</label>
             <Seg value={f.pay} onChange={v => setF(s => ({ ...s, pay: v }))} options={[{ v: 'cash', label: 'Tiền mặt' }, { v: 'bank', label: 'Chuyển khoản' }, { v: 'debt', label: 'Ghi nợ', danger: true }]} /></div>
           <div className="c6 row-actions">
@@ -216,7 +230,7 @@ export default function Sales() {
           <table>
             <thead><tr><th>#</th><th>Món</th><th>Khách</th><th className="r">Kg</th><th className="r">Giá</th><th className="r">Thành tiền</th><th></th></tr></thead>
             <tbody>{rows.map((s, i) => {
-              const extra = [s.processing_fee ? 'chế biến ' + short(s.processing_fee) : '', s.shipping_fee ? 'ship ' + short(s.shipping_fee) : '', s.size].filter(Boolean).join(' · ')
+              const extra = [s.processing_fee ? 'chế biến ' + short(s.processing_fee) : '', s.shipping_fee ? 'ship ' + short(s.shipping_fee) : '', s.shipper_id ? 'giao: ' + cap(shipperName(s.shipper_id)) : '', s.size].filter(Boolean).join(' · ')
               return (
                 <tr key={s.id} className={(editable(s) ? 'click' : '') + (editId === s.id ? ' editing' : '')} onClick={() => editable(s) && edit(s)}>
                   <td className="sub">{i + 1}</td>

@@ -8,6 +8,7 @@ export default function More() {
     <>
       <div className="menu">
         <Link to="/so-tien#cong-no">Công nợ <span>khách nợ, nợ mối hàng</span></Link>
+        <Link to="/shipper">Shipper <span>lương shipper nhà, tiền ship theo đơn, còn nợ</span></Link>
         <Link to="/danh-muc">Danh mục <span>món hàng, khách, mối hàng, số điện thoại</span></Link>
         {isManager && <Link to="/nhat-ky">Nhật ký thay đổi <span>ai thêm, sửa, xóa gì, lúc nào</span></Link>}
         {isManager && <Link to="/excel">Nhập / xuất Excel <span>chuyển sổ cũ vào app, tải sổ về máy</span></Link>}

@@ -11,12 +11,26 @@ interface RowMeta { id: string; shop_id: string; date: string; created_by: strin
 export interface Sale extends RowMeta {
   product_id: string; customer_id: string | null; size: string | null; qty: number; unit_price: number
   processing_fee: number; shipping_fee: number; pay_method: PayMethod; paid: boolean; paid_at: string | null
+  shipper_id: string | null; delivery_id: string | null
 }
 export interface Purchase extends RowMeta {
   product_id: string; supplier_id: string | null; size: string | null; qty: number; unit_price: number
   freight: number; pay_method: PayMethod; paid: boolean; paid_at: string | null
 }
-export interface CashEntry extends RowMeta { direction: 'in' | 'out'; category: string; amount: number; pay_method: PayMethod }
+export interface CashEntry extends RowMeta {
+  direction: 'in' | 'out'; category: string; amount: number; pay_method: PayMethod; shipper_id: string | null; period: string | null
+}
+export type ShipperKind = 'staff' | 'outside'
+export interface Shipper {
+  id: string; shop_id: string; name: string; phone: string | null; kind: ShipperKind
+  monthly_salary: number; per_order_fee: number; active: boolean; note: string | null
+}
+export interface Delivery extends RowMeta { shipper_id: string; customer_id: string | null; fee: number; auto: boolean }
+export interface ShipperMonth {
+  shipper_id: string; name: string; phone: string | null; kind: ShipperKind; active: boolean; monthly_salary: number; per_order_fee: number
+  orders: number; fees: number; salary: number; due: number; paid: number; prev_debt: number; balance: number
+}
+export const SHIPPER_KIND: Record<ShipperKind, string> = { staff: 'Shipper nhà', outside: 'Shipper ngoài' }
 export interface StockAdj extends RowMeta { product_id: string; qty: number; reason: 'loss' | 'count' }
 
 export interface StockLevel {

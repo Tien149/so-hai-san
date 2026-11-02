@@ -6,7 +6,7 @@ import { ROLE_LABEL, type AuditRow, type Member, type Role } from '../lib/types'
 import { Empty } from '../components/ui'
 
 const TABLES: Record<string, string> = {
-  sales: 'Bán hàng', purchases: 'Nhập hàng', cash_entries: 'Thu chi', stock_adjustments: 'Hao hụt/kiểm kho',
+  sales: 'Bán hàng', shippers: 'Shipper', deliveries: 'Chuyến giao', purchases: 'Nhập hàng', cash_entries: 'Thu chi', stock_adjustments: 'Hao hụt/kiểm kho',
   products: 'Món hàng', partners: 'Khách/mối', shop_members: 'Nhân viên', shops: 'Thông tin quán',
 }
 const ACTIONS: Record<string, [string, string]> = { insert: ['Thêm', 'p-cash'], update: ['Sửa', 'p-warn'], delete: ['Xóa', 'p-debt'] }
@@ -16,13 +16,13 @@ const FIELDS: Record<string, string> = {
   amount: 'Số tiền', category: 'Khoản', direction: 'Loại', note: 'Ghi chú', size: 'Size', name: 'Tên', phone: 'SĐT', role: 'Quyền',
   opening_cash: 'Tiền ban đầu', address: 'Địa chỉ', default_sell_price: 'Giá bán mặc định', reason: 'Lý do',
 }
-const SKIP = new Set(['id', 'shop_id', 'created_at', 'updated_at', 'created_by', 'user_id'])
-const MONEY = new Set(['unit_price', 'processing_fee', 'shipping_fee', 'freight', 'amount', 'opening_cash', 'default_sell_price'])
+const SKIP = new Set(['id', 'shop_id', 'created_at', 'updated_at', 'created_by', 'user_id', 'delivery_id'])
+const MONEY = new Set(['unit_price', 'processing_fee', 'shipping_fee', 'freight', 'amount', 'opening_cash', 'default_sell_price', 'fee', 'monthly_salary', 'per_order_fee'])
 const PAGE = 50
 
 export default function AuditLog() {
   const app = useApp()
-  const { shop, productName, partnerName } = app
+  const { shop, productName, partnerName, shipperName } = app
   const [rows, setRows] = useState<AuditRow[]>([])
   const [members, setMembers] = useState<Member[]>([])
   const [table, setTable] = useState('')
@@ -50,6 +50,8 @@ export default function AuditLog() {
     if (v == null || v === '') return '∅'
     if (k === 'product_id') return cap(productName(String(v))) || 'món đã xóa'
     if (k === 'customer_id' || k === 'supplier_id') return cap(partnerName(String(v))) || '(đã xóa)'
+    if (k === 'shipper_id') return cap(shipperName(String(v))) || '(đã xóa)'
+    if (k === 'kind') return v === 'staff' ? 'shipper nhà' : v === 'outside' ? 'shipper ngoài' : String(v)
     if (MONEY.has(k)) return money(Number(v))
     if (k === 'paid') return v ? 'có' : 'chưa (nợ)'
     if (k === 'pay_method') return v === 'bank' ? 'chuyển khoản' : 'tiền mặt'
@@ -63,6 +65,7 @@ export default function AuditLog() {
     if (r.table_name === 'sales' || r.table_name === 'purchases' || r.table_name === 'stock_adjustments')
       return `${cap(productName(String(d.product_id))) || 'món đã xóa'} ${d.qty}kg${d.unit_price ? ' × ' + money(Number(d.unit_price)) : ''} · ngày ${dm(String(d.date))}`
     if (r.table_name === 'cash_entries') return `${d.direction === 'in' ? 'Thu' : 'Chi'} ${cap(String(d.category))} ${money(Number(d.amount))}`
+    if (r.table_name === 'deliveries') return `Chuyến giao · ${cap(shipperName(String(d.shipper_id)))}${d.customer_id ? ' → ' + cap(partnerName(String(d.customer_id))) : ''} · ${money(Number(d.fee))} · ngày ${dm(String(d.date))}`
     if (r.table_name === 'shop_members') return `${who.get(String(d.user_id)) || 'người dùng'} · ${ROLE_LABEL[d.role as Role] || String(d.role)}`
     return cap(String(d.name ?? ''))
   }
