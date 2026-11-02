@@ -545,3 +545,8 @@ begin
     alter publication supabase_realtime add table public.sales, public.purchases, public.cash_entries, public.stock_adjustments, public.products, public.partners;
   end if;
 end $$;
+
+-- Khách chưa đăng nhập (anon) không được gọi hàm nghiệp vụ
+revoke execute on function public.create_shop, public.add_member, public.list_members, public.settle_debt,
+  public.ensure_product, public.ensure_partner, public.daily_pnl, public.product_pnl, public.cash_flow,
+  public.stock_levels, public.product_costs from anon;
