@@ -8,7 +8,9 @@ import { ConfirmButton, Empty, PayPill, Seg, Tile, useLive, MoneyInput } from '.
 import { Combo } from '../components/Combo'
 
 type Pay = PayMethod | 'debt'
-const blank = { product: '', customer: '', qty: '', price: '', cb: '', ship: '', size: '', note: '', pay: 'cash' as Pay, shipper: '' }
+// 0.3704 → "0,37" (làm tròn tới gam)
+const kgText = (n: number) => String(Math.round(n * 1000) / 1000).replace('.', ',')
+const blank = { product: '', customer: '', qty: '', price: '', amt: '', cb: '', ship: '', size: '', note: '', pay: 'cash' as Pay, shipper: '' }
 
 export default function Sales() {
   const app = useApp()
@@ -67,7 +69,15 @@ export default function Sales() {
   }
 
   const qty = parseNum(f.qty), price = parseMoney(f.price), cb = parseMoney(f.cb) || 0, ship = parseMoney(f.ship) || 0
-  const total = qty > 0 && price > 0 ? qty * price + cb + ship : 0
+  // Khách mua theo tiền ("lấy 100k"): gõ thành tiền thì tự ra số kg, sổ ghi đúng số tiền đã gõ
+  const typedAmt = parseMoney(f.amt)
+  const amount = typedAmt > 0 ? typedAmt : qty > 0 && price > 0 ? Math.round(qty * price) : 0
+  const total = amount ? amount + cb + ship : 0
+  useEffect(() => {
+    if (!(typedAmt > 0) || !(price > 0)) return
+    const q = kgText(typedAmt / price)
+    setF(s => (s.qty === q ? s : { ...s, qty: q }))
+  }, [typedAmt, price])
 
   const pickProduct = (name: string) => {
     const p = products.find(x => x.name === name)
@@ -86,7 +96,7 @@ export default function Sales() {
       const product_id = await app.ensureProduct(f.product)
       const customer_id = await app.ensurePartner('customer', f.customer)
       const rec = {
-        product_id, customer_id, qty, unit_price: price, processing_fee: cb, shipping_fee: ship,
+        product_id, customer_id, qty, unit_price: price, amount, processing_fee: cb, shipping_fee: ship,
         size: f.size.trim() || null, note: f.note.trim() || null,
         pay_method: (f.pay === 'debt' ? 'cash' : f.pay) as PayMethod, paid: f.pay !== 'debt',
         shipper_id: f.shipper || null,
@@ -113,7 +123,8 @@ export default function Sales() {
     setEditId(s.id)
     setF({
       product: productName(s.product_id), customer: partnerName(s.customer_id), qty: String(s.qty).replace('.', ','),
-      price: toThousand(s.unit_price), cb: toThousand(s.processing_fee), ship: toThousand(s.shipping_fee),
+      price: toThousand(s.unit_price), amt: saleAmount(s) !== Math.round(Number(s.qty) * Number(s.unit_price)) ? toThousand(saleAmount(s)) : '',
+      cb: toThousand(s.processing_fee), ship: toThousand(s.shipping_fee),
       size: s.size || '', note: s.note || '', pay: s.paid ? s.pay_method : 'debt', shipper: s.shipper_id || '',
     })
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -192,11 +203,15 @@ export default function Sales() {
             <Combo id="s_cust" value={f.customer} placeholder="khách lẻ" newLabel="Khách mới" options={customerOpts}
               onChange={v => setF(s => ({ ...s, customer: v }))} onPick={() => setTimeout(() => qtyRef.current?.focus())} /></div>
           <div className="f c2"><label htmlFor="s_qty">Số kg</label>
-            <input id="s_qty" ref={qtyRef} inputMode="decimal" value={f.qty} placeholder="1,5" onChange={set('qty')} /></div>
+            <input id="s_qty" ref={qtyRef} inputMode="decimal" value={f.qty} placeholder="1,5" onChange={e => { const v = e.target.value; setF(s => ({ ...s, qty: v, amt: '' })) }} />
+            {typedAmt > 0 && <span className="hint">tính từ thành tiền</span>}</div>
           <div className="f c2"><label htmlFor="s_price">Giá / kg</label>
             <MoneyInput id="s_price" value={f.price} placeholder="270" onChange={set('price')} />
             <span className="hint">{price > 0 ? `= ${money(price)}/kg` : 'gõ 270 = 270.000đ'}</span></div>
-          <div className="f c2"><label>Thành tiền</label><div className="big">{money(total)}</div></div>
+          <div className="f c2"><label htmlFor="s_amt">Thành tiền</label>
+            <MoneyInput id="s_amt" className={typedAmt > 0 ? '' : 'auto'} value={f.amt || toThousand(amount)} placeholder="gõ tiền ra kg"
+              onFocus={e => e.target.select()} onChange={e => { const v = e.target.value; setF(s => ({ ...s, amt: v })) }} />
+            <span className="hint">{cb + ship > 0 && total ? `khách trả ${money(total)}` : typedAmt > 0 ? (price > 0 ? `= ${money(typedAmt)} · ${kg(qty)}kg` : 'nhập giá để ra kg') : 'gõ 100 = khách mua 100k'}</span></div>
           <div className="f c2"><label htmlFor="s_cb">Chế biến</label>
             <MoneyInput id="s_cb" value={f.cb} placeholder="0" onChange={set('cb')} /></div>
           <div className="f c2"><label htmlFor="s_ship">Ship</label>

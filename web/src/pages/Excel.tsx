@@ -4,7 +4,7 @@ import { useApp } from '../lib/app'
 import { supabase, must } from '../lib/supabase'
 import { cap, dm, dmy, kg, money, parseMoney, today, addDays } from '../lib/format'
 import { alreadyIn, parseSheets, purchaseKey, saleKey, suspiciousPrices, type ImportResult } from '../lib/excel'
-import type { CashEntry, Purchase, Sale, StockAdj } from '../lib/types'
+import { saleAmount, type CashEntry, type Purchase, type Sale, type StockAdj } from '../lib/types'
 import { MoneyInput } from '../components/ui'
 
 const CHUNK = 500
@@ -108,7 +108,7 @@ export default function Excel() {
         if (!byProd.has(pid)) byProd.set(pid, blank())
         f(d.get(pid)!); f(byProd.get(pid)!)
       }
-      s.forEach(x => bump(x.date, x.product_id, r => { r.sellKg += +x.qty; r.rev += +x.qty * +x.unit_price }))
+      s.forEach(x => bump(x.date, x.product_id, r => { r.sellKg += +x.qty; r.rev += saleAmount(x) }))
       p.forEach(x => bump(x.date, x.product_id, r => { r.buyKg += +x.qty; r.buy += +x.qty * +x.unit_price + +x.freight }))
       a.forEach(x => bump(x.date, x.product_id, r => { r.lossKg += +x.qty }))
       const nameOf = (pid: string) => cap(productName(pid))
@@ -133,7 +133,7 @@ export default function Excel() {
         ...sortByName(byProd).map(([pid, r]) => [...prodCols(pid, r), r2(r.lossKg)])],
         { 0: 22 })
       add('Bán hàng', [['Ngày', 'Khách', 'Tên hàng', 'Size', 'Số kg', 'Đơn giá', 'Thành tiền', 'Chế biến', 'Ship', 'Thanh toán', 'Ngày trả', 'Ghi chú'],
-        ...s.map(x => [dmy(x.date), cap(partnerName(x.customer_id)), cap(productName(x.product_id)), x.size, +x.qty, +x.unit_price, Math.round(+x.qty * +x.unit_price), +x.processing_fee, +x.shipping_fee, pay(x), x.paid_at ? dmy(x.paid_at) : '', x.note])])
+        ...s.map(x => [dmy(x.date), cap(partnerName(x.customer_id)), cap(productName(x.product_id)), x.size, +x.qty, +x.unit_price, saleAmount(x), +x.processing_fee, +x.shipping_fee, pay(x), x.paid_at ? dmy(x.paid_at) : '', x.note])])
       add('Nhập hàng', [['Ngày', 'Tên hàng', 'Size', 'Số kg', 'Giá/kg', 'Thành tiền', 'Cước xe + bãi', 'Mối hàng', 'Thanh toán', 'Ngày trả', 'Ghi chú'],
         ...p.map(x => [dmy(x.date), cap(productName(x.product_id)), x.size, +x.qty, +x.unit_price, Math.round(+x.qty * +x.unit_price), +x.freight, cap(partnerName(x.supplier_id)), pay(x), x.paid_at ? dmy(x.paid_at) : '', x.note])])
       add('Thu chi khác', [['Ngày', 'Loại', 'Khoản', 'Số tiền', 'Hình thức', 'Ghi chú'],

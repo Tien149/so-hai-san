@@ -44,7 +44,7 @@ export default function Dashboard() {
         must(supabase.rpc('daily_pnl', { p_shop: shop.id, p_from: from, p_to: to })),
         must(supabase.rpc('product_pnl', { p_shop: shop.id, p_from: from, p_to: to })),
         must(supabase.rpc('cash_flow', { p_shop: shop.id, p_from: from, p_to: to })),
-        must(supabase.from('sales').select('customer_id, qty, unit_price, processing_fee, shipping_fee').eq('shop_id', shop.id).gte('date', from).lte('date', to).not('customer_id', 'is', null).limit(10000)),
+        must(supabase.from('sales').select('customer_id, qty, unit_price, amount, processing_fee, shipping_fee').eq('shop_id', shop.id).gte('date', from).lte('date', to).not('customer_id', 'is', null).limit(10000)),
         must(supabase.from('purchases').select('supplier_id, qty, unit_price, freight').eq('shop_id', shop.id).gte('date', from).lte('date', to).limit(10000)),
       ])
       setDays(d as DailyPnl[]); setProds(p as ProductPnl[]); setFlow((f as CashFlow[])[0] || null)
@@ -53,7 +53,7 @@ export default function Dashboard() {
         rows.forEach(r => { const k = String(r[key] ?? ''); const x = m.get(k) || [0, 0]; x[0] += val(r); x[1]++; m.set(k, x) })
         return [...m.entries()].map(([k, v]) => [k, v[0], v[1]] as [string, number, number]).sort((a, b) => b[1] - a[1])
       }
-      setCust(agg(s as Record<string, unknown>[], 'customer_id', r => N(r.qty) * N(r.unit_price) + N(r.processing_fee) + N(r.shipping_fee)).slice(0, 15))
+      setCust(agg(s as Record<string, unknown>[], 'customer_id', r => N(r.amount) + N(r.processing_fee) + N(r.shipping_fee)).slice(0, 15))
       setSup(agg(b as Record<string, unknown>[], 'supplier_id', r => N(r.qty) * N(r.unit_price) + N(r.freight)))
     } catch (e) { app.fail(e) } finally { setLoading(false) }
   }, [shop, from, to]) // eslint-disable-line react-hooks/exhaustive-deps
