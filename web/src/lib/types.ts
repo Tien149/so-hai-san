@@ -10,6 +10,8 @@ export interface Partner { id: string; kind: PartnerKind; name: string; phone: s
 interface RowMeta { id: string; shop_id: string; date: string; created_by: string; created_at: string; updated_at: string; note: string | null }
 export interface Sale extends RowMeta {
   product_id: string; customer_id: string | null; size: string | null; qty: number; unit_price: number
+  /** thành tiền hàng (không gồm chế biến, ship); có thể khác kg × giá khi khách mua theo tiền */
+  amount: number
   processing_fee: number; shipping_fee: number; pay_method: PayMethod; paid: boolean; paid_at: string | null
   shipper_id: string | null; delivery_id: string | null
 }
@@ -53,8 +55,9 @@ export interface AuditRow {
 }
 export interface Member { user_id: string; role: Role; display_name: string | null; email: string; created_at: string }
 
-export const saleAmount = (s: Pick<Sale, 'qty' | 'unit_price'>) => Number(s.qty) * Number(s.unit_price)
-export const saleTotal = (s: Pick<Sale, 'qty' | 'unit_price' | 'processing_fee' | 'shipping_fee'>) =>
+export const saleAmount = (s: Pick<Sale, 'qty' | 'unit_price'> & { amount?: number | null }) =>
+  s.amount != null ? Number(s.amount) : Math.round(Number(s.qty) * Number(s.unit_price))
+export const saleTotal = (s: Pick<Sale, 'qty' | 'unit_price' | 'processing_fee' | 'shipping_fee'> & { amount?: number | null }) =>
   saleAmount(s) + Number(s.processing_fee) + Number(s.shipping_fee)
 export const purchaseAmount = (p: Pick<Purchase, 'qty' | 'unit_price'>) => Number(p.qty) * Number(p.unit_price)
 

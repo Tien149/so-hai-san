@@ -141,3 +141,4 @@ input.fee-in{width:110px;text-align:right;padding:6px 8px;font-size:14px}
   .side-foot button{border:0;background:none;cursor:pointer;color:var(--muted);width:100%}
   main,.top-row{max-width:1100px}
 }
+input.auto{color:var(--muted)}
