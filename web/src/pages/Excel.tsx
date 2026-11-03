@@ -3,11 +3,22 @@ import * as XLSX from 'xlsx'
 import { useApp } from '../lib/app'
 import { supabase, must } from '../lib/supabase'
 import { cap, dm, dmy, kg, money, parseMoney, today, addDays } from '../lib/format'
-import { parseSheets, suspiciousPrices, type ImportResult } from '../lib/excel'
+import { alreadyIn, parseSheets, purchaseKey, saleKey, suspiciousPrices, type ImportResult } from '../lib/excel'
 import type { CashEntry, Purchase, Sale, StockAdj } from '../lib/types'
 import { MoneyInput } from '../components/ui'
 
 const CHUNK = 500
+
+// Supabase trả tối đa 1000 dòng mỗi lần, nên lấy từng trang
+type Page = { range: (a: number, b: number) => PromiseLike<{ data: unknown; error: unknown }> }
+async function all<T>(make: () => Page): Promise<T[]> {
+  const out: T[] = []
+  for (let i = 0; ; i += 1000) {
+    const rows = await must(make().range(i, i + 999)) as T[]
+    out.push(...rows)
+    if (rows.length < 1000) return out
+  }
+}
 
 export default function Excel() {
   const app = useApp()
@@ -17,20 +28,24 @@ export default function Excel() {
   const [busy, setBusy] = useState(false)
   const [from, setFrom] = useState(addDays(today(), -30))
   const [to, setTo] = useState(today())
-  const [dup, setDup] = useState<{ sales: number; buys: number; days: string[] } | null>(null)
+  // dòng nào trong file đã có trong sổ (theo vị trí trong file)
+  const [done, setDone] = useState<{ s: Set<number>; p: Set<number> } | null>(null)
 
-  // Kiểm tra các ngày trong file đã từng nhập từ Excel chưa, tránh nạp trùng
-  const checkDup = async (r: ImportResult) => {
-    setDup(null)
+  const checkDone = async (r: ImportResult) => {
+    setDone(null)
     if (!shop) return
     const days = (rows: { date: string }[]) => [...new Set(rows.map(x => x.date))]
-    const count = async (t: string, d: string[]) => {
-      if (!d.length) return []
-      const rows = await must(supabase.from(t).select('date').eq('shop_id', shop.id).eq('note', 'nhập từ Excel').in('date', d).limit(5000)) as { date: string }[]
-      return rows.map(x => x.date)
-    }
-    const [s, p] = await Promise.all([count('sales', days(r.sales)), count('purchases', days(r.purchases))])
-    if (s.length || p.length) setDup({ sales: s.length, buys: p.length, days: [...new Set([...s, ...p])].sort() })
+    const old = async <T,>(t: string, cols: string, d: string[]) => d.length
+      ? await all<T>(() => supabase.from(t).select(cols).eq('shop_id', shop.id).eq('note', 'nhập từ Excel').in('date', d).order('id'))
+      : []
+    const [os, op] = await Promise.all([
+      old<Sale>('sales', 'date, product_id, customer_id, qty, processing_fee, shipping_fee', days(r.sales)),
+      old<Purchase>('purchases', 'date, product_id, supplier_id, qty, freight', days(r.purchases)),
+    ])
+    setDone({
+      s: alreadyIn(r.sales, os.map(x => saleKey({ ...x, product: productName(x.product_id), customer: partnerName(x.customer_id) })), saleKey),
+      p: alreadyIn(r.purchases, op.map(x => purchaseKey({ ...x, product: productName(x.product_id), supplier: partnerName(x.supplier_id) })), purchaseKey),
+    })
   }
 
   const read = async (file: File) => {
@@ -38,32 +53,34 @@ export default function Excel() {
       const wb = XLSX.read(await file.arrayBuffer(), { cellDates: true })
       const sheets: Record<string, (string | number | Date | null)[][]> = {}
       wb.SheetNames.forEach(n => { sheets[n] = XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, raw: true, defval: null }) })
-      const r = parseSheets(sheets, new Date().getFullYear()); setRes(r); setFix({}); void checkDup(r).catch(() => setDup(null))
+      const r = parseSheets(sheets, new Date().getFullYear()); setRes(r); setFix({}); void checkDone(r).catch(e => app.fail(e))
     } catch { app.toast('Không đọc được file. Hãy chọn file .xlsx') }
   }
 
-  const suspPurch = res ? suspiciousPrices(res.purchases) : []
+  const newS = res && done ? res.sales.filter((_, i) => !done.s.has(i)) : []
+  const newP = res && done ? res.purchases.filter((_, i) => !done.p.has(i)) : []
+  const suspPurch = suspiciousPrices(newP)
   const flagged = res ? [
-    ...suspiciousPrices(res.sales).map(r => ({ key: 's' + res.sales.indexOf(r), kind: 'Bán', r })),
-    ...res.purchases.filter(r => r.total_price || suspPurch.includes(r)).map(r => ({ key: 'p' + res.purchases.indexOf(r), kind: 'Nhập', r })),
+    ...suspiciousPrices(newS).map(r => ({ key: 's' + res.sales.indexOf(r), kind: 'Bán', r })),
+    ...newP.filter(r => r.total_price || suspPurch.includes(r)).map(r => ({ key: 'p' + res.purchases.indexOf(r), kind: 'Nhập', r })),
   ] : []
 
   const doImport = async () => {
-    if (!shop || !res) return
+    if (!shop || !res || !done) return
     setBusy(true)
     try {
       const pid = new Map<string, string>(), cid = new Map<string, string | null>(), sid = new Map<string, string | null>()
-      for (const n of new Set([...res.sales.map(s => s.product), ...res.purchases.map(p => p.product)])) pid.set(n, await app.ensureProduct(n))
-      for (const n of new Set(res.sales.map(s => s.customer))) cid.set(n, await app.ensurePartner('customer', n))
-      for (const n of new Set(res.purchases.map(p => p.supplier))) sid.set(n, await app.ensurePartner('supplier', n))
+      for (const n of new Set([...newS.map(s => s.product), ...newP.map(p => p.product)])) pid.set(n, await app.ensureProduct(n))
+      for (const n of new Set(newS.map(s => s.customer))) cid.set(n, await app.ensurePartner('customer', n))
+      for (const n of new Set(newP.map(p => p.supplier))) sid.set(n, await app.ensurePartner('supplier', n))
       const price = (key: string, v: number) => (fix[key] ? parseMoney(fix[key]) || v : v)
-      const sales = res.sales.map((s, i) => ({ shop_id: shop.id, date: s.date, product_id: pid.get(s.product), customer_id: cid.get(s.customer) ?? null,
-        qty: s.qty, unit_price: price('s' + i, s.unit_price), processing_fee: s.processing_fee, shipping_fee: s.shipping_fee, note: 'nhập từ Excel' }))
-      const buys = res.purchases.map((p, i) => ({ shop_id: shop.id, date: p.date, product_id: pid.get(p.product), supplier_id: sid.get(p.supplier) ?? null,
-        qty: p.qty, unit_price: price('p' + i, p.unit_price), freight: p.freight, size: p.size || null, note: 'nhập từ Excel' }))
+      const sales = res.sales.flatMap((s, i) => done.s.has(i) ? [] : [{ shop_id: shop.id, date: s.date, product_id: pid.get(s.product), customer_id: cid.get(s.customer) ?? null,
+        qty: s.qty, unit_price: price('s' + i, s.unit_price), processing_fee: s.processing_fee, shipping_fee: s.shipping_fee, note: 'nhập từ Excel' }])
+      const buys = res.purchases.flatMap((p, i) => done.p.has(i) ? [] : [{ shop_id: shop.id, date: p.date, product_id: pid.get(p.product), supplier_id: sid.get(p.supplier) ?? null,
+        qty: p.qty, unit_price: price('p' + i, p.unit_price), freight: p.freight, size: p.size || null, note: 'nhập từ Excel' }])
       for (let i = 0; i < buys.length; i += CHUNK) await must(supabase.from('purchases').insert(buys.slice(i, i + CHUNK)))
       for (let i = 0; i < sales.length; i += CHUNK) await must(supabase.from('sales').insert(sales.slice(i, i + CHUNK)))
-      app.toast(`Đã nhập ${sales.length} dòng bán, ${buys.length} dòng nhập`); setRes(null); setDup(null)
+      app.toast(`Đã nạp ${sales.length} dòng bán, ${buys.length} dòng nhập mới`); setRes(null); setDone(null)
     } catch (e) { app.fail(e) } finally { setBusy(false) }
   }
 
@@ -71,7 +88,7 @@ export default function Excel() {
     if (!shop) return
     setBusy(true)
     try {
-      const q = <T,>(t: string) => must(supabase.from(t).select('*').eq('shop_id', shop.id).gte('date', from).lte('date', to).order('date').order('created_at').limit(50000)) as Promise<T[]>
+      const q = <T,>(t: string) => all<T>(() => supabase.from(t).select('*').eq('shop_id', shop.id).gte('date', from).lte('date', to).order('date').order('created_at').order('id'))
       const [s, p, c, a] = await Promise.all([q<Sale>('sales'), q<Purchase>('purchases'), q<CashEntry>('cash_entries'), q<StockAdj>('stock_adjustments')])
       const [pnl, costs] = await Promise.all([
         must(supabase.rpc('daily_pnl', { p_shop: shop.id, p_from: from, p_to: to })) as Promise<Record<string, number | string>[]>,
@@ -149,13 +166,13 @@ export default function Excel() {
                     <MoneyInput aria-label="Giá đúng" placeholder="giá đúng" style={{ width: 120 }} value={fix[key] || ''} onChange={e => setFix({ ...fix, [key]: e.target.value })} />
                   </div>))}
               </div>)}
-            {dup && (
-              <div className="note stack">
-                <b>File này có vẻ đã nhập rồi.</b>
-                <span>Các ngày {dup.days.map(dm).join(', ')} đã có {dup.sales ? `${dup.sales} dòng bán` : ''}{dup.sales && dup.buys ? ' và ' : ''}{dup.buys ? `${dup.buys} dòng nhập` : ''} từ Excel. Nhập nữa thì số liệu sẽ bị cộng 2 lần. Chỉ bấm "Vẫn nhập" nếu đây là dòng mới thật.</span>
+            {!done ? <div className="sub">Đang so với sổ…</div> : (
+              <div className={done.s.size + done.p.size ? 'note stack' : 'stack'}>
+                {done.s.size + done.p.size > 0 && <span>Có <b>{done.s.size + done.p.size}</b> dòng đã nạp từ lần trước, app sẽ bỏ qua.</span>}
+                <span>{newS.length + newP.length ? <>Sẽ nạp <b>{newS.length}</b> dòng bán và <b>{newP.length}</b> dòng nhập mới.</> : <b>Không có dòng nào mới để nạp.</b>}</span>
               </div>)}
-            <div className="row-actions"><button type="button" className={dup ? 'btn danger' : 'btn'} disabled={busy || !(res.sales.length + res.purchases.length)} onClick={() => void doImport()}>{busy ? 'Đang nhập…' : dup ? 'Vẫn nhập' : 'Nhập vào sổ'}</button>
-              <button type="button" className="btn ghost" onClick={() => { setRes(null); setDup(null) }}>Hủy</button></div>
+            <div className="row-actions"><button type="button" className="btn" disabled={busy || !(newS.length + newP.length)} onClick={() => void doImport()}>{busy ? 'Đang nạp…' : 'Nạp dòng mới vào sổ'}</button>
+              <button type="button" className="btn ghost" onClick={() => { setRes(null); setDone(null) }}>Hủy</button></div>
             <p className="sub" style={{ margin: 0 }}>Các dòng cũ được tính là đã trả tiền mặt. Nếu khách còn nợ, mở ngày đó và sửa lại.</p>
           </div>)}
       </div>

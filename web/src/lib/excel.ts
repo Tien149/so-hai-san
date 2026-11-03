@@ -107,3 +107,20 @@ export function suspiciousPrices<T extends { product: string; unit_price: number
   by.forEach((a, k) => { const s = [...a].sort((x, y) => x - y); med.set(k, s[Math.floor(s.length / 2)]) })
   return rows.filter(r => { const m = med.get(r.product)!; return by.get(r.product)!.length >= 3 && (r.unit_price > m * 4 || r.unit_price * 4 < m) })
 }
+
+// Sổ Excel của quán thường là 1 file ghi nối tiếp. Mỗi lần nạp chỉ lấy những dòng chưa có trong sổ.
+// So theo ngày + tên hàng + khách/mối + số kg + phí (không so giá, vì lúc nạp có thể đã sửa giá gõ nhầm).
+const q3 = (n: number | string) => Number(n).toFixed(3)
+export const saleKey = (x: { date: string; product: string; customer: string; qty: number | string; processing_fee: number | string; shipping_fee: number | string }) =>
+  [x.date, normName(x.product), normName(x.customer), q3(x.qty), Number(x.processing_fee), Number(x.shipping_fee)].join('|')
+export const purchaseKey = (x: { date: string; product: string; supplier: string; qty: number | string; freight: number | string }) =>
+  [x.date, normName(x.product), normName(x.supplier), q3(x.qty), Number(x.freight)].join('|')
+
+/** Trả về vị trí các dòng trong file đã có trong sổ (mỗi dòng trong sổ chỉ khớp được 1 dòng file). */
+export function alreadyIn<T>(fileRows: T[], existing: string[], key: (r: T) => string): Set<number> {
+  const left = new Map<string, number>()
+  existing.forEach(k => left.set(k, (left.get(k) || 0) + 1))
+  const done = new Set<number>()
+  fileRows.forEach((r, i) => { const k = key(r), n = left.get(k) || 0; if (n > 0) { done.add(i); left.set(k, n - 1) } })
+  return done
+}
