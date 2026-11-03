@@ -2,9 +2,9 @@
 -- số kg chỉ để trừ kho. Đơn bán theo kg mà quán làm tròn tiền cũng sửa được thành tiền.
 alter table public.sales add column amount bigint;
 -- điền cho đơn cũ, không ghi nhật ký hàng loạt
-set local session_replication_role = replica;
+alter table public.sales disable trigger user;
 update public.sales set amount = round(qty * unit_price);
-set local session_replication_role = origin;
+alter table public.sales enable trigger user;
 alter table public.sales alter column amount set not null,
   add constraint sales_amount_nonneg check (amount >= 0);
 
