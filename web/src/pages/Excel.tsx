@@ -17,13 +17,28 @@ export default function Excel() {
   const [busy, setBusy] = useState(false)
   const [from, setFrom] = useState(addDays(today(), -30))
   const [to, setTo] = useState(today())
+  const [dup, setDup] = useState<{ sales: number; buys: number; days: string[] } | null>(null)
+
+  // Kiểm tra các ngày trong file đã từng nhập từ Excel chưa, tránh nạp trùng
+  const checkDup = async (r: ImportResult) => {
+    setDup(null)
+    if (!shop) return
+    const days = (rows: { date: string }[]) => [...new Set(rows.map(x => x.date))]
+    const count = async (t: string, d: string[]) => {
+      if (!d.length) return []
+      const rows = await must(supabase.from(t).select('date').eq('shop_id', shop.id).eq('note', 'nhập từ Excel').in('date', d).limit(5000)) as { date: string }[]
+      return rows.map(x => x.date)
+    }
+    const [s, p] = await Promise.all([count('sales', days(r.sales)), count('purchases', days(r.purchases))])
+    if (s.length || p.length) setDup({ sales: s.length, buys: p.length, days: [...new Set([...s, ...p])].sort() })
+  }
 
   const read = async (file: File) => {
     try {
       const wb = XLSX.read(await file.arrayBuffer(), { cellDates: true })
       const sheets: Record<string, (string | number | Date | null)[][]> = {}
       wb.SheetNames.forEach(n => { sheets[n] = XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, raw: true, defval: null }) })
-      setRes(parseSheets(sheets, new Date().getFullYear())); setFix({})
+      const r = parseSheets(sheets, new Date().getFullYear()); setRes(r); setFix({}); void checkDup(r).catch(() => setDup(null))
     } catch { app.toast('Không đọc được file. Hãy chọn file .xlsx') }
   }
 
@@ -48,7 +63,7 @@ export default function Excel() {
         qty: p.qty, unit_price: price('p' + i, p.unit_price), freight: p.freight, size: p.size || null, note: 'nhập từ Excel' }))
       for (let i = 0; i < buys.length; i += CHUNK) await must(supabase.from('purchases').insert(buys.slice(i, i + CHUNK)))
       for (let i = 0; i < sales.length; i += CHUNK) await must(supabase.from('sales').insert(sales.slice(i, i + CHUNK)))
-      app.toast(`Đã nhập ${sales.length} dòng bán, ${buys.length} dòng nhập`); setRes(null)
+      app.toast(`Đã nhập ${sales.length} dòng bán, ${buys.length} dòng nhập`); setRes(null); setDup(null)
     } catch (e) { app.fail(e) } finally { setBusy(false) }
   }
 
@@ -134,8 +149,13 @@ export default function Excel() {
                     <MoneyInput aria-label="Giá đúng" placeholder="giá đúng" style={{ width: 120 }} value={fix[key] || ''} onChange={e => setFix({ ...fix, [key]: e.target.value })} />
                   </div>))}
               </div>)}
-            <div className="row-actions"><button type="button" className="btn" disabled={busy || !(res.sales.length + res.purchases.length)} onClick={() => void doImport()}>{busy ? 'Đang nhập…' : 'Nhập vào sổ'}</button>
-              <button type="button" className="btn ghost" onClick={() => setRes(null)}>Hủy</button></div>
+            {dup && (
+              <div className="note stack">
+                <b>File này có vẻ đã nhập rồi.</b>
+                <span>Các ngày {dup.days.map(dm).join(', ')} đã có {dup.sales ? `${dup.sales} dòng bán` : ''}{dup.sales && dup.buys ? ' và ' : ''}{dup.buys ? `${dup.buys} dòng nhập` : ''} từ Excel. Nhập nữa thì số liệu sẽ bị cộng 2 lần. Chỉ bấm "Vẫn nhập" nếu đây là dòng mới thật.</span>
+              </div>)}
+            <div className="row-actions"><button type="button" className={dup ? 'btn danger' : 'btn'} disabled={busy || !(res.sales.length + res.purchases.length)} onClick={() => void doImport()}>{busy ? 'Đang nhập…' : dup ? 'Vẫn nhập' : 'Nhập vào sổ'}</button>
+              <button type="button" className="btn ghost" onClick={() => { setRes(null); setDup(null) }}>Hủy</button></div>
             <p className="sub" style={{ margin: 0 }}>Các dòng cũ được tính là đã trả tiền mặt. Nếu khách còn nợ, mở ngày đó và sửa lại.</p>
           </div>)}
       </div>
