@@ -58,19 +58,55 @@ export default function Excel() {
     try {
       const q = <T,>(t: string) => must(supabase.from(t).select('*').eq('shop_id', shop.id).gte('date', from).lte('date', to).order('date').order('created_at').limit(50000)) as Promise<T[]>
       const [s, p, c, a] = await Promise.all([q<Sale>('sales'), q<Purchase>('purchases'), q<CashEntry>('cash_entries'), q<StockAdj>('stock_adjustments')])
-      const pnl = await must(supabase.rpc('daily_pnl', { p_shop: shop.id, p_from: from, p_to: to })) as Record<string, number | string>[]
+      const [pnl, costs] = await Promise.all([
+        must(supabase.rpc('daily_pnl', { p_shop: shop.id, p_from: from, p_to: to })) as Promise<Record<string, number | string>[]>,
+        must(supabase.rpc('product_costs', { p_shop: shop.id })) as Promise<{ product_id: string; avg_cost: number | null }[]>,
+      ])
+      const cost = new Map(costs.map(x => [x.product_id, Number(x.avg_cost) || 0]))
       const pay = (x: { paid: boolean; pay_method: string }) => !x.paid ? 'Nợ' : x.pay_method === 'bank' ? 'Chuyển khoản' : 'Tiền mặt'
+      const r2 = (n: number) => Math.round(n * 100) / 100
+      // Gom theo ngày + tên hàng
+      type Row = { buyKg: number; buy: number; sellKg: number; rev: number; lossKg: number }
+      const blank = (): Row => ({ buyKg: 0, buy: 0, sellKg: 0, rev: 0, lossKg: 0 })
+      const byDay = new Map<string, Map<string, Row>>(), byProd = new Map<string, Row>()
+      const bump = (date: string, pid: string, f: (r: Row) => void) => {
+        if (!byDay.has(date)) byDay.set(date, new Map())
+        const d = byDay.get(date)!
+        if (!d.has(pid)) d.set(pid, blank())
+        if (!byProd.has(pid)) byProd.set(pid, blank())
+        f(d.get(pid)!); f(byProd.get(pid)!)
+      }
+      s.forEach(x => bump(x.date, x.product_id, r => { r.sellKg += +x.qty; r.rev += +x.qty * +x.unit_price }))
+      p.forEach(x => bump(x.date, x.product_id, r => { r.buyKg += +x.qty; r.buy += +x.qty * +x.unit_price + +x.freight }))
+      a.forEach(x => bump(x.date, x.product_id, r => { r.lossKg += +x.qty }))
+      const nameOf = (pid: string) => cap(productName(pid))
+      const sortByName = (m: Map<string, Row>) => [...m.entries()].sort((x, y) => y[1].rev - x[1].rev || nameOf(x[0]).localeCompare(nameOf(y[0]), 'vi'))
+      const soldList = (day: string) => sortByName(byDay.get(day) || new Map()).filter(([, r]) => r.sellKg).map(([pid, r]) => `${nameOf(pid)} ${kg(r.sellKg)}kg`).join(', ')
+      const prodCols = (pid: string, r: Row) => {
+        const cogs = Math.round(r.sellKg * (cost.get(pid) || 0))
+        return [nameOf(pid), r2(r.buyKg), Math.round(r.buy), r2(r.sellKg), Math.round(r.rev), cogs, Math.round(r.rev) - cogs]
+      }
       const wb = XLSX.utils.book_new()
-      const add = (name: string, rows: (string | number | null)[][]) => { const ws = XLSX.utils.aoa_to_sheet(rows); ws['!cols'] = rows[0].map(() => ({ wch: 14 })); XLSX.utils.book_append_sheet(wb, ws, name) }
-      add('Tổng hợp ngày', [['Ngày', 'Doanh thu', 'Chế biến + ship', 'Giá vốn', 'Hao hụt', 'Thu khác', 'Chi khác', 'Nhập hàng', 'Cước', 'Lãi ròng'],
-        ...pnl.filter(d => Number(d.revenue) || Number(d.purchases) || Number(d.other_out)).map(d => [dmy(String(d.day)), Math.round(+d.revenue), +d.service, Math.round(+d.cogs), Math.round(+d.loss), +d.other_in, +d.other_out, Math.round(+d.purchases), +d.freight, Math.round(+d.net)])])
-      add('Bán hàng', [['Ngày', 'Khách', 'Món', 'Size', 'Số kg', 'Đơn giá', 'Thành tiền', 'Chế biến', 'Ship', 'Thanh toán', 'Ngày trả', 'Ghi chú'],
+      const add = (name: string, rows: (string | number | null)[][], wide: Record<number, number> = {}) => {
+        const ws = XLSX.utils.aoa_to_sheet(rows); ws['!cols'] = rows[0].map((_, i) => ({ wch: wide[i] || 14 })); XLSX.utils.book_append_sheet(wb, ws, name)
+      }
+      add('Tổng hợp ngày', [['Ngày', 'Tên hàng đã bán', 'Doanh thu', 'Chế biến + ship', 'Giá vốn', 'Hao hụt', 'Thu khác', 'Chi khác', 'Nhập hàng', 'Cước', 'Lãi ròng'],
+        ...pnl.filter(d => Number(d.revenue) || Number(d.purchases) || Number(d.other_out)).map(d => [dmy(String(d.day)), soldList(String(d.day)), Math.round(+d.revenue), +d.service, Math.round(+d.cogs), Math.round(+d.loss), +d.other_in, +d.other_out, Math.round(+d.purchases), +d.freight, Math.round(+d.net)])],
+        { 1: 50 })
+      const head = ['Tên hàng', 'Kg nhập', 'Tiền nhập (gồm cước)', 'Kg bán', 'Doanh thu', 'Giá vốn', 'Lãi gộp']
+      add('Theo ngày + tên hàng', [['Ngày', ...head],
+        ...[...byDay.keys()].sort().flatMap(day => sortByName(byDay.get(day)!).filter(([, r]) => r.buyKg || r.sellKg).map(([pid, r]) => [dmy(day), ...prodCols(pid, r)]))],
+        { 1: 22 })
+      add('Tổng theo tên hàng', [[...head, 'Hao hụt kg'],
+        ...sortByName(byProd).map(([pid, r]) => [...prodCols(pid, r), r2(r.lossKg)])],
+        { 0: 22 })
+      add('Bán hàng', [['Ngày', 'Khách', 'Tên hàng', 'Size', 'Số kg', 'Đơn giá', 'Thành tiền', 'Chế biến', 'Ship', 'Thanh toán', 'Ngày trả', 'Ghi chú'],
         ...s.map(x => [dmy(x.date), cap(partnerName(x.customer_id)), cap(productName(x.product_id)), x.size, +x.qty, +x.unit_price, Math.round(+x.qty * +x.unit_price), +x.processing_fee, +x.shipping_fee, pay(x), x.paid_at ? dmy(x.paid_at) : '', x.note])])
-      add('Nhập hàng', [['Ngày', 'Món', 'Size', 'Số kg', 'Giá/kg', 'Thành tiền', 'Cước xe + bãi', 'Mối hàng', 'Thanh toán', 'Ngày trả', 'Ghi chú'],
+      add('Nhập hàng', [['Ngày', 'Tên hàng', 'Size', 'Số kg', 'Giá/kg', 'Thành tiền', 'Cước xe + bãi', 'Mối hàng', 'Thanh toán', 'Ngày trả', 'Ghi chú'],
         ...p.map(x => [dmy(x.date), cap(productName(x.product_id)), x.size, +x.qty, +x.unit_price, Math.round(+x.qty * +x.unit_price), +x.freight, cap(partnerName(x.supplier_id)), pay(x), x.paid_at ? dmy(x.paid_at) : '', x.note])])
       add('Thu chi khác', [['Ngày', 'Loại', 'Khoản', 'Số tiền', 'Hình thức', 'Ghi chú'],
         ...c.map(x => [dmy(x.date), x.direction === 'in' ? 'Thu' : 'Chi', cap(x.category), +x.amount, x.pay_method === 'bank' ? 'Chuyển khoản' : 'Tiền mặt', x.note])])
-      add('Hao hụt', [['Ngày', 'Món', 'Kg', 'Ghi chú'], ...a.map(x => [dmy(x.date), cap(productName(x.product_id)), +x.qty, x.note])])
+      add('Hao hụt', [['Ngày', 'Tên hàng', 'Kg', 'Ghi chú'], ...a.map(x => [dmy(x.date), cap(productName(x.product_id)), +x.qty, x.note])])
       XLSX.writeFile(wb, `so-hai-san-${from}-den-${to}.xlsx`)
     } catch (e) { app.fail(e) } finally { setBusy(false) }
   }
