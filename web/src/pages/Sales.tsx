@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 import { Link } from 'react-router-dom'
 import { useApp } from '../lib/app'
 import { supabase, must } from '../lib/supabase'
-import { addDays, cap, dm, kg, money, parseMoney, parseNum, short, toThousand } from '../lib/format'
+import { addDays, cap, dm, kg, money, parseMoney, parseNum, toThousand } from '../lib/format'
 import { saleAmount, saleTotal, type PayMethod, type Sale } from '../lib/types'
 import { ConfirmButton, Empty, PayPill, Seg, Tile, useLive, MoneyInput } from '../components/ui'
 import { Combo } from '../components/Combo'
@@ -56,7 +56,7 @@ export default function Sales() {
     const rank = new Map(top.map((id, i) => [id, i]))
     return [...products]
       .sort((a, b) => (rank.get(a.id) ?? 999) - (rank.get(b.id) ?? 999) || a.name.localeCompare(b.name, 'vi'))
-      .map(p => { const lp = lastPrice.get(p.id) || p.default_sell_price; return { value: p.name, hint: lp ? short(lp) : undefined } })
+      .map(p => { const lp = lastPrice.get(p.id) || p.default_sell_price; return { value: p.name, hint: lp ? money(lp) : undefined } })
   }, [products, top, lastPrice])
   const customerOpts = useMemo(() => partners.filter(p => p.kind === 'customer')
     .sort((a, b) => a.name.localeCompare(b.name, 'vi')).map(p => ({ value: p.name, hint: p.phone || undefined })), [partners])
@@ -191,7 +191,7 @@ export default function Sales() {
               {top.map(id => (
                 <button type="button" key={id} className={'chip' + (f.product === productName(id) ? ' on' : '')}
                   onClick={() => { setF(s => ({ ...s, product: productName(id), price: toThousand(lastPrice.get(id)) })); qtyRef.current?.focus() }}>
-                  {cap(productName(id))} <span className="sub">{short(lastPrice.get(id))}</span>
+                  {cap(productName(id))} <span className="sub">{money(lastPrice.get(id))}</span>
                 </button>
               ))}
             </div></div>
@@ -223,7 +223,7 @@ export default function Sales() {
               <button type="button" className={'chip' + (!f.shipper ? ' on' : '')} onClick={() => setF(s => ({ ...s, shipper: '' }))}>Khách tự lấy</button>
               {activeShippers.map(sh => (
                 <button type="button" key={sh.id} className={'chip' + (f.shipper === sh.id ? ' on' : '')} onClick={() => setF(s => ({ ...s, shipper: s.shipper === sh.id ? '' : sh.id }))}>
-                  {cap(sh.name)} <span className="sub">{sh.kind === 'staff' ? 'nhà' : sh.per_order_fee ? short(sh.per_order_fee) + '/đơn' : 'ngoài'}</span>
+                  {cap(sh.name)} <span className="sub">{sh.kind === 'staff' ? 'nhà' : sh.per_order_fee ? money(sh.per_order_fee) + '/đơn' : 'ngoài'}</span>
                 </button>
               ))}
               {isManager && <Link className="chip add" to="/shipper">+ Thêm shipper</Link>}
@@ -245,13 +245,13 @@ export default function Sales() {
           <table>
             <thead><tr><th>#</th><th>Món</th><th>Khách</th><th className="r">Kg</th><th className="r">Giá</th><th className="r">Thành tiền</th><th></th></tr></thead>
             <tbody>{rows.map((s, i) => {
-              const extra = [s.processing_fee ? 'chế biến ' + short(s.processing_fee) : '', s.shipping_fee ? 'ship ' + short(s.shipping_fee) : '', s.shipper_id ? 'giao: ' + cap(shipperName(s.shipper_id)) : '', s.size].filter(Boolean).join(' · ')
+              const extra = [s.processing_fee ? 'chế biến ' + money(s.processing_fee) : '', s.shipping_fee ? 'ship ' + money(s.shipping_fee) : '', s.shipper_id ? 'giao: ' + cap(shipperName(s.shipper_id)) : '', s.size].filter(Boolean).join(' · ')
               return (
                 <tr key={s.id} className={(editable(s) ? 'click' : '') + (editId === s.id ? ' editing' : '')} onClick={() => editable(s) && edit(s)}>
                   <td className="sub">{i + 1}</td>
                   <td><b>{cap(productName(s.product_id))}</b>{extra && <div className="sub">{extra}</div>}</td>
                   <td>{s.customer_id ? cap(partnerName(s.customer_id)) : <span className="sub">lẻ</span>}</td>
-                  <td className="r">{kg(s.qty)}</td><td className="r">{short(s.unit_price)}</td>
+                  <td className="r">{kg(s.qty)}</td><td className="r">{money(s.unit_price)}</td>
                   <td className="r"><b>{money(saleTotal(s))}</b></td><td><PayPill paid={s.paid} method={s.pay_method} /></td>
                 </tr>)
             })}</tbody>
@@ -264,7 +264,7 @@ export default function Sales() {
       <div className="card stack">
         {bills.size ? <div className="chips">{[...bills.keys()].map(id => (
           <button type="button" key={id} className={'chip' + (billFor === id ? ' on' : '')} onClick={() => setBillFor(billFor === id ? null : id)}>
-            {cap(partnerName(id))} · {short(bills.get(id)!.reduce((a, s) => a + saleTotal(s), 0))}
+            {cap(partnerName(id))} · {money(bills.get(id)!.reduce((a, s) => a + saleTotal(s), 0))}
           </button>))}</div> : <span className="sub">Ghi tên khách khi bán để tạo hóa đơn gửi khách.</span>}
         {billText && <><pre className="bill">{billText}</pre><div><button type="button" className="btn sm" onClick={copyBill}>Sao chép để gửi Zalo</button></div></>}
       </div>

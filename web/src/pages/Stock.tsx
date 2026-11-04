@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useApp } from '../lib/app'
 import { supabase, must } from '../lib/supabase'
-import { cap, dm, kg, money, parseNum, short } from '../lib/format'
+import { cap, dm, kg, money, parseNum } from '../lib/format'
 import type { StockAdj, StockLevel } from '../lib/types'
 import { ConfirmButton, Empty, Tile, useLive } from '../components/ui'
 
@@ -82,8 +82,8 @@ export default function Stock() {
                   <td><b>{cap(l.name)}</b></td><td className="r">{kg(l.in_qty)}</td><td className="r">{kg(l.out_qty)}</td>
                   <td className="r">{Number(l.adj_qty) ? kg(l.adj_qty) : ''}</td>
                   <td className="r">{o < -0.05 ? <span className="pill p-warn">{Number(l.in_qty) ? 'âm ' + kg(o) : 'chưa có nhập'}</span> : o > 0.05 ? <b>{kg(o)}</b> : <span className="sub">hết</span>}</td>
-                  <td className="r">{c != null ? short(c) : '–'}</td><td className="r">{s != null ? short(s) : '–'}</td>
-                  <td className="r">{m != null ? <span className={m >= 0 ? 'good' : 'bad'}>{short(m)}</span> : '–'}</td>
+                  <td className="r">{c != null ? money(c) : '–'}</td><td className="r">{s != null ? money(s) : '–'}</td>
+                  <td className="r">{m != null ? <span className={m >= 0 ? 'good' : 'bad'}>{money(m)}</span> : '–'}</td>
                 </tr>)
             })}</tbody>
           </table>)}

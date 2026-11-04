@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { useApp } from '../lib/app'
 import { supabase, must } from '../lib/supabase'
-import { cap, dm, kg, money, parseMoney, parseNum, short, toThousand } from '../lib/format'
+import { cap, dm, kg, money, parseMoney, parseNum, toThousand } from '../lib/format'
 import { purchaseAmount, type PayMethod, type Purchase } from '../lib/types'
 import { ConfirmButton, Empty, PayPill, Seg, Tile, useLive, MoneyInput } from '../components/ui'
 import { Combo } from '../components/Combo'
@@ -137,11 +137,11 @@ export default function Purchases() {
             <tbody>{rows.map(b => (
               <tr key={b.id} className={(editable(b) ? 'click' : '') + (editId === b.id ? ' editing' : '')} onClick={() => editable(b) && edit(b)}>
                 <td><b>{cap(productName(b.product_id))}</b>{b.size && <div className="sub">{b.size}</div>}</td>
-                <td>{cap(partnerName(b.supplier_id))}</td><td className="r">{kg(b.qty)}</td><td className="r">{short(b.unit_price)}</td>
-                <td className="r">{Number(b.freight) ? short(b.freight) : ''}</td><td className="r"><b>{money(purchaseAmount(b))}</b></td>
+                <td>{cap(partnerName(b.supplier_id))}</td><td className="r">{kg(b.qty)}</td><td className="r">{money(b.unit_price)}</td>
+                <td className="r">{Number(b.freight) ? money(b.freight) : ''}</td><td className="r"><b>{money(purchaseAmount(b))}</b></td>
                 <td><PayPill paid={b.paid} method={b.pay_method} /></td>
               </tr>))}</tbody>
-            <tfoot><tr><td>{rows.length} dòng</td><td></td><td className="r">{kg(sum.q)}</td><td></td><td className="r">{short(sum.fr)}</td><td className="r">{money(sum.amt)}</td><td></td></tr></tfoot>
+            <tfoot><tr><td>{rows.length} dòng</td><td></td><td className="r">{kg(sum.q)}</td><td></td><td className="r">{money(sum.fr)}</td><td className="r">{money(sum.amt)}</td><td></td></tr></tfoot>
           </table>)}
       </div></div>
     </>

@@ -86,11 +86,11 @@ export default function Dashboard() {
 
       <div className="tiles">
         <Tile kind="main" k="Lãi ròng ước tính" v={money(t.net)} s={t.revenue ? `${Math.round(t.net / (t.revenue + t.service) * 100)}% doanh thu` : ''} />
-        <Tile k="Doanh thu" v={money(t.revenue + t.service)} s={`${t.orders} dòng bán · chế biến/ship ${short(t.service)}`} />
-        <Tile k="Giá vốn hàng bán" v={money(t.cogs)} s={`lãi gộp ${short(gross)}${t.revenue ? ` (${Math.round(gross / t.revenue * 100)}%)` : ''}`} />
-        <Tile kind="out" k="Hao hụt + chi phí" v={money(t.loss + t.other_out)} s={`hao ${short(t.loss)} · chi ${short(t.other_out)}`} />
+        <Tile k="Doanh thu" v={money(t.revenue + t.service)} s={`${t.orders} dòng bán · chế biến/ship ${money(t.service)}`} />
+        <Tile k="Giá vốn hàng bán" v={money(t.cogs)} s={`lãi gộp ${money(gross)}${t.revenue ? ` (${Math.round(gross / t.revenue * 100)}%)` : ''}`} />
+        <Tile kind="out" k="Hao hụt + chi phí" v={money(t.loss + t.other_out)} s={`hao ${money(t.loss)} · chi ${money(t.other_out)}`} />
         <Tile kind="in" k="Tiền thực vào" v={money(cashIn)} />
-        <Tile kind="out" k="Tiền thực ra" v={money(cashOut)} s={`nhập hàng + cước ${short(t.purchases + t.freight)}`} />
+        <Tile kind="out" k="Tiền thực ra" v={money(cashOut)} s={`nhập hàng + cước ${money(t.purchases + t.freight)}`} />
       </div>
 
       <div className="card">
@@ -119,9 +119,9 @@ export default function Dashboard() {
               const g = N(p.revenue) - N(p.cogs) - N(p.loss)
               return (<tr key={p.product_id}>
                 <td><b>{cap(p.name)}</b>{!p.has_cost && N(p.revenue) > 0 && <> <span className="pill p-warn">chưa có giá vốn</span></>}</td>
-                <td className="r">{kg(p.qty)}</td><td className="r">{short(p.revenue)}</td><td className="r">{short(p.cogs)}</td>
-                <td className="r">{N(p.loss) ? short(p.loss) : ''}</td>
-                <td className="r"><b className={g >= 0 ? 'good' : 'bad'}>{short(g)}</b></td>
+                <td className="r">{kg(p.qty)}</td><td className="r">{money(p.revenue)}</td><td className="r">{money(p.cogs)}</td>
+                <td className="r">{N(p.loss) ? money(p.loss) : ''}</td>
+                <td className="r"><b className={g >= 0 ? 'good' : 'bad'}>{money(g)}</b></td>
                 <td className="r">{N(p.revenue) && p.has_cost ? Math.round(g / N(p.revenue) * 100) + '%' : ''}</td></tr>)
             })}</tbody></table>)}
         {noCost.length > 0 && <p className="note" style={{ marginTop: 10 }}>{noCost.map(p => cap(p.name)).join(', ')} chưa có phiếu nhập nên giá vốn tạm tính 0đ, lãi đang cao hơn thực tế.</p>}
@@ -138,9 +138,9 @@ export default function Dashboard() {
         <table><thead><tr><th>Ngày</th><th className="r">Doanh thu</th><th className="r">Giá vốn</th><th className="r">Nhập hàng</th><th className="r">Chi khác</th><th className="r">Lãi ròng</th></tr></thead>
           <tbody>{days.filter(d => N(d.revenue) || N(d.purchases) || N(d.other_out)).reverse().map(d => (
             <tr key={d.day} className="click" onClick={() => { setDay(d.day); navigate('/') }}>
-              <td><b>{dow(d.day)} {dm(d.day)}</b></td><td className="r">{short(N(d.revenue) + N(d.service))}</td><td className="r">{short(d.cogs)}</td>
-              <td className="r">{short(N(d.purchases) + N(d.freight))}</td><td className="r">{short(d.other_out)}</td>
-              <td className="r"><b className={N(d.net) >= 0 ? 'good' : 'bad'}>{short(d.net)}</b></td></tr>))}</tbody></table>
+              <td><b>{dow(d.day)} {dm(d.day)}</b></td><td className="r">{money(N(d.revenue) + N(d.service))}</td><td className="r">{money(d.cogs)}</td>
+              <td className="r">{money(N(d.purchases) + N(d.freight))}</td><td className="r">{money(d.other_out)}</td>
+              <td className="r"><b className={N(d.net) >= 0 ? 'good' : 'bad'}>{money(d.net)}</b></td></tr>))}</tbody></table>
       </div></div>
       <p className="sub">Lãi ròng = doanh thu − giá vốn (giá nhập bình quân gồm cước) + chế biến/ship + thu khác − hao hụt − chi phí khác. Tiền nhập hàng không trừ thẳng vào lãi vì hàng còn tồn trong kho.</p>
     </>

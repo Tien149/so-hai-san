@@ -120,7 +120,14 @@ export default function Excel() {
       }
       const wb = XLSX.utils.book_new()
       const add = (name: string, rows: (string | number | null)[][], wide: Record<number, number> = {}) => {
-        const ws = XLSX.utils.aoa_to_sheet(rows); ws['!cols'] = rows[0].map((_, i) => ({ wch: wide[i] || 14 })); XLSX.utils.book_append_sheet(wb, ws, name)
+        const ws = XLSX.utils.aoa_to_sheet(rows); ws['!cols'] = rows[0].map((_, i) => ({ wch: wide[i] || 14 }))
+        // Số có dấu phân cách hàng ngàn; cột kg giữ 2 số lẻ
+        const isKg = rows[0].map(h => /(^|\s)kg($|\s)/i.test(String(h ?? '')))
+        for (let r = 1; r < rows.length; r++) rows[r].forEach((v, c) => {
+          const cell = ws[XLSX.utils.encode_cell({ r, c })]
+          if (cell && typeof v === 'number') cell.z = isKg[c] ? '#,##0.00' : '#,##0'
+        })
+        XLSX.utils.book_append_sheet(wb, ws, name)
       }
       add('Tổng hợp ngày', [['Ngày', 'Tên hàng đã bán', 'Doanh thu', 'Chế biến + ship', 'Giá vốn', 'Hao hụt', 'Thu khác', 'Chi khác', 'Nhập hàng', 'Cước', 'Lãi ròng'],
         ...pnl.filter(d => Number(d.revenue) || Number(d.purchases) || Number(d.other_out)).map(d => [dmy(String(d.day)), soldList(String(d.day)), Math.round(+d.revenue), +d.service, Math.round(+d.cogs), Math.round(+d.loss), +d.other_in, +d.other_out, Math.round(+d.purchases), +d.freight, Math.round(+d.net)])],

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useApp } from '../lib/app'
 import { supabase, must } from '../lib/supabase'
-import { cap, dm, money, parseMoney, short, today, toThousand } from '../lib/format'
+import { cap, dm, money, parseMoney, today, toThousand } from '../lib/format'
 import { SHIPPER_KIND, type CashEntry, type Delivery, type PayMethod, type Shipper, type ShipperKind, type ShipperMonth } from '../lib/types'
 import { ConfirmButton, Empty, MoneyInput, Seg, Tile, useLive } from '../components/ui'
 import { Combo } from '../components/Combo'
@@ -174,7 +174,7 @@ export default function Shippers() {
                   <div><b>{cap(r.name)}</b> <span className={'pill ' + (r.kind === 'staff' ? 'p-bank' : 'p-warn')}>{SHIPPER_KIND[r.kind]}</span>
                     {!r.active && <span className="pill p-debt">Đã ngưng</span>}
                     <div className="sub">{r.kind === 'staff' ? `Lương ${money(r.monthly_salary)}/tháng` : `${money(r.per_order_fee)}/đơn`}
-                      {r.kind === 'staff' && Number(r.per_order_fee) > 0 && ` + ${short(r.per_order_fee)}/đơn`}{r.phone && ` · ${r.phone}`}</div></div>
+                      {r.kind === 'staff' && Number(r.per_order_fee) > 0 && ` + ${money(r.per_order_fee)}/đơn`}{r.phone && ` · ${r.phone}`}</div></div>
                   {isManager && s && <button type="button" className="btn ghost sm" onClick={() => startEdit(s)}>Sửa</button>}
                 </div>
                 <div className="cf">

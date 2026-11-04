@@ -33,7 +33,7 @@ h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--mute
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
 .tile{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;min-width:0}
 .tile .k{font-size:12px;color:var(--muted)}
-.tile .v{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile .v{font-size:clamp(16px,4.6vw,20px);font-weight:700;font-variant-numeric:tabular-nums;line-height:1.25;overflow-wrap:anywhere}
 .tile .s{font-size:12px;color:var(--muted)}
 .tile.in .v{color:var(--good)} .tile.out .v{color:var(--coral)}
 .tile.main{background:var(--sea);border-color:var(--sea);color:#fff}
