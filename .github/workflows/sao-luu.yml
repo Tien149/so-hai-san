@@ -1,0 +1,64 @@
+name: Sao lưu dữ liệu hằng đêm
+
+# Mỗi đêm 2 giờ sáng giờ VN: chép dữ liệu Supabase, nén có mật khẩu, gửi qua Telegram.
+# Không in dữ liệu ra log vì repo đang public.
+on:
+  schedule:
+    - cron: '0 19 * * *'   # 19:00 UTC = 02:00 giờ VN
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TG_CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}
+      ZIP_PW: ${{ secrets.BACKUP_PASSWORD }}
+    steps:
+      - name: Kiểm tra đủ thông tin
+        run: |
+          for v in DB_URL TG_TOKEN TG_CHAT ZIP_PW; do
+            if [ -z "${!v}" ]; then echo "Thiếu secret cho $v"; exit 1; fi
+          done
+
+      - name: Chép dữ liệu
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          PG="docker run --rm -e DB_URL -v $PWD/out:/out postgres:17"
+          # Toàn bộ bảng của app (cấu trúc + dữ liệu)
+          $PG sh -c 'pg_dump "$DB_URL" -n public --no-owner --no-privileges -Fc -f /out/app.dump'
+          # Tài khoản đăng nhập (chỉ dữ liệu)
+          $PG sh -c 'pg_dump "$DB_URL" --data-only -t auth.users -t auth.identities --no-owner --no-privileges -Fc -f /out/taikhoan.dump'
+          # Vài con số để nhìn là biết bản sao lưu có dữ liệu
+          $PG sh -c 'psql "$DB_URL" -At -F" " -c "select (select count(*) from public.shops),(select count(*) from public.sales),(select count(*) from public.purchases)"' > out/counts.txt
+
+      - name: Nén có mật khẩu
+        run: |
+          set -euo pipefail
+          D=$(TZ=Asia/Ho_Chi_Minh date +%Y-%m-%d)
+          echo "D=$D" >> "$GITHUB_ENV"
+          7z a -t7z -mhe=on -p"$ZIP_PW" "sao-luu-$D.7z" ./out/app.dump ./out/taikhoan.dump > /dev/null
+          ls -la "sao-luu-$D.7z"
+
+      - name: Gửi qua Telegram
+        run: |
+          set -euo pipefail
+          read SHOPS SALES BUYS < out/counts.txt
+          SIZE=$(du -h "sao-luu-$D.7z" | cut -f1)
+          CAP="✅ Sao lưu $D: $SHOPS quán, $SALES đơn bán, $BUYS đơn nhập ($SIZE)"
+          curl -sf -o /dev/null "https://api.telegram.org/bot$TG_TOKEN/sendDocument" \
+            -F chat_id="$TG_CHAT" -F caption="$CAP" -F document=@"sao-luu-$D.7z"
+
+      - name: Báo lỗi qua Telegram
+        if: failure()
+        run: |
+          [ -n "$TG_TOKEN" ] && [ -n "$TG_CHAT" ] || exit 0
+          curl -s -o /dev/null "https://api.telegram.org/bot$TG_TOKEN/sendMessage" \
+            -d chat_id="$TG_CHAT" \
+            --data-urlencode text="⚠️ Sao lưu đêm nay bị lỗi. Xem: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
