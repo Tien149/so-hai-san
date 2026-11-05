@@ -52,8 +52,13 @@ jobs:
           read SHOPS SALES BUYS < out/counts.txt
           SIZE=$(du -h "sao-luu-$D.7z" | cut -f1)
           CAP="✅ Sao lưu $D: $SHOPS quán, $SALES đơn bán, $BUYS đơn nhập ($SIZE)"
-          curl -sf -o /dev/null "https://api.telegram.org/bot$TG_TOKEN/sendDocument" \
-            -F chat_id="$TG_CHAT" -F caption="$CAP" -F document=@"sao-luu-$D.7z"
+          RES=$(curl -s "https://api.telegram.org/bot$TG_TOKEN/sendDocument" \
+            -F chat_id="$TG_CHAT" -F caption="$CAP" -F document=@"sao-luu-$D.7z")
+          if [ "$(echo "$RES" | jq -r .ok)" != "true" ]; then
+            echo "Telegram từ chối: $(echo "$RES" | jq -r .description)"
+            echo "(401 = mã bot sai; chat not found = chưa bấm Start với bot hoặc sai ID)"
+            exit 1
+          fi
 
       - name: Báo lỗi qua Telegram
         if: failure()
