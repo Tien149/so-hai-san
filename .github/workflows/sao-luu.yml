@@ -52,13 +52,24 @@ jobs:
           read SHOPS SALES BUYS < out/counts.txt
           SIZE=$(du -h "sao-luu-$D.7z" | cut -f1)
           CAP="✅ Sao lưu $D: $SHOPS quán, $SALES đơn bán, $BUYS đơn nhập ($SIZE)"
-          RES=$(curl -s "https://api.telegram.org/bot$TG_TOKEN/sendDocument" \
-            -F chat_id="$TG_CHAT" -F caption="$CAP" -F document=@"sao-luu-$D.7z")
-          if [ "$(echo "$RES" | jq -r .ok)" != "true" ]; then
-            echo "Telegram từ chối: $(echo "$RES" | jq -r .description)"
-            echo "(401 = mã bot sai; chat not found = chưa bấm Start với bot hoặc sai ID)"
-            exit 1
-          fi
+          # Telegram đôi khi lỗi tạm thời (Bad Gateway, quá tải): thử lại tối đa 4 lần,
+          # chờ 30s, 1 phút, 2 phút. Lỗi do cấu hình (400/401/403) thì dừng ngay.
+          for LAN in 1 2 3 4; do
+            RES=$(curl -s --max-time 120 "https://api.telegram.org/bot$TG_TOKEN/sendDocument" \
+              -F chat_id="$TG_CHAT" -F caption="$CAP" -F document=@"sao-luu-$D.7z" || true)
+            if [ "$(echo "$RES" | jq -r .ok 2>/dev/null)" = "true" ]; then
+              echo "Đã gửi (lần $LAN)"
+              exit 0
+            fi
+            MA=$(echo "$RES" | jq -r .error_code 2>/dev/null || echo "")
+            echo "Lần $LAN: Telegram từ chối: $(echo "$RES" | jq -r .description 2>/dev/null || echo 'không phản hồi')"
+            case "$MA" in 400|401|403)
+              echo "(401 = mã bot sai; chat not found = chưa bấm Start với bot hoặc sai ID)"
+              exit 1;;
+            esac
+            [ "$LAN" -lt 4 ] && sleep $((15 * 2 ** LAN))
+          done
+          exit 1
 
       - name: Báo lỗi qua Telegram
         if: failure()
